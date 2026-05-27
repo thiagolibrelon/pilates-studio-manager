@@ -81,7 +81,7 @@ export function Ficha({
         const st = students.find((s) => s.id === studentId);
         if (st) {
           setForm(st);
-          setTab("evolucoes");
+          setTab(showEnrF ? "horarios" : "evolucoes");
         }
       }
     }
@@ -112,8 +112,11 @@ export function Ficha({
       const id = "s" + Math.random().toString(36).slice(2, 9);
       const newStudent = { ...form, id };
       onAddStudent(newStudent);
+      setTab("horarios");
+      setEnrForm({ scheduleId: schedules[0]?.id || "", days: [] });
+      setShowEnrF(true);
       onNavigate("ficha", id);
-      alert("✅ Cadastrado!");
+      alert("Aluno cadastrado. Agora vincule uma turma para ele aparecer na matriz do inicio.");
     } else {
       onUpdateStudent(form);
       alert("✅ Salvo!");

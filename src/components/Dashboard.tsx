@@ -13,9 +13,10 @@ interface DashboardProps {
   enrollments: Enrollment[];
   pendingCount: number;
   onNavigate: (route: string, id?: string | null) => void;
+  onOpenScheduleSession: (scheduleId: string, weekday: string) => void;
 }
 
-export function Dashboard({ t, students, payments, expenses, schedules, sessions, enrollments, pendingCount, onNavigate }: DashboardProps) {
+export function Dashboard({ t, students, payments, expenses, schedules, sessions, enrollments, pendingCount, onNavigate, onOpenScheduleSession }: DashboardProps) {
   const [showInadModal, setShowInadModal] = useState(false);
 
   const activeStudents = students.filter((s) => ["Ativo", "Trial", "Wellhub"].includes(s.status));
@@ -184,11 +185,10 @@ export function Dashboard({ t, students, payments, expenses, schedules, sessions
                     const half = o.occupied > o.max / 2;
                     const bg = full ? t.occ.full : half ? t.occ.half : t.occ.avail;
                     const col = full ? t.occ.fullT : half ? t.occ.halfT : t.occ.availT;
-                    const ses = sessions.find((s) => s.scheduleId === sc.id && s.day === TODAY);
                     return (
                       <td key={day} className="py-1 px-1">
                         <button
-                          onClick={() => ses && onNavigate("aula", ses.id)}
+                          onClick={() => onOpenScheduleSession(sc.id, day)}
                           className="w-full rounded-xl py-1 px-1 text-center text-xs font-semibold transition-all hover:opacity-75"
                           style={{ background: bg, color: col }}
                         >

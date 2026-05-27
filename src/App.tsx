@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Route, ThemeKey, Student, Plan, Schedule, Enrollment, Session, Evolution, Payment, Expense, Presence, Anamnese, PendingEvolution } from "./types";
 import { THEMES, INIT_STUDENTS, INIT_PLANS, INIT_SCHEDULES, INIT_ENROLLMENTS, INIT_SESSIONS, INIT_EVOLUTIONS, INIT_PAYMENTS, INIT_EXPENSES, INIT_PRESENCE, INIT_CLASS_TYPES } from "./data";
-import { uid, TODAY } from "./utils";
+import { uid, TODAY, WD } from "./utils";
 import { Av } from "./components/ui";
 import { EvoForm, ReciboModal, ThemeModal } from "./components/modals";
 import { Dashboard } from "./components/Dashboard";
@@ -141,6 +141,45 @@ export default function App() {
     setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
   };
 
+  const dateForWeekday = (weekday: string) => {
+    const weekdayIndex = WD.indexOf(weekday as (typeof WD)[number]);
+    const today = new Date(TODAY + "T12:00:00");
+    const targetDay = weekdayIndex + 1;
+    const diff = targetDay - today.getDay();
+    today.setDate(today.getDate() + diff);
+    return today.toISOString().slice(0, 10);
+  };
+
+  const handleOpenScheduleSession = (scheduleId: string, weekday: string) => {
+    const day = dateForWeekday(weekday);
+    const enrolled = enrollments.filter((e) => e.scheduleId === scheduleId && e.days.includes(weekday));
+    const basePresences = Object.fromEntries(enrolled.map((e) => [e.studentId, { status: null, type: "fixo" as const }]));
+    const existing = sessions.find((s) => s.scheduleId === scheduleId && s.day === day);
+
+    if (existing) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === existing.id ? { ...s, presences: { ...basePresences, ...s.presences } } : s))
+      );
+      nav("aula", existing.id);
+      return;
+    }
+
+    const id = "ses" + uid();
+    setSessions((prev) => [
+      ...prev,
+      {
+        id,
+        scheduleId,
+        day,
+        presences: basePresences,
+        pendingEvos: [],
+        evolved: [],
+        finalized: false,
+      },
+    ]);
+    nav("aula", id);
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const NAV = [
@@ -196,6 +235,7 @@ export default function App() {
             enrollments={enrollments}
             pendingCount={pendingCount}
             onNavigate={nav}
+            onOpenScheduleSession={handleOpenScheduleSession}
           />
         )}
 
