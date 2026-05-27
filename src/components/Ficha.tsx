@@ -333,9 +333,11 @@ export function Ficha({
                   <span className="font-medium" style={{ color: t.p[700] }}>
                     {ex.name}
                   </span>
-                  <span className="text-gray-400">
-                    {ex.series}×{ex.reps} · {ex.equipment}
-                  </span>
+                  {(ex.series || ex.reps || ex.equipment) && (
+                    <span className="text-gray-400">
+                      {[ex.series && ex.reps ? `${ex.series}x${ex.reps}` : null, ex.equipment].filter(Boolean).join(" - ")}
+                    </span>
+                  )}
                 </div>
               ))}
               {ev.clinicalNotes && <p className="text-xs text-gray-500 mt-1 italic">"{ev.clinicalNotes}"</p>}

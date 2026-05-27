@@ -91,9 +91,11 @@ export function Evolucoes({ t, evolutions, allPending, students, /*schedules,*/ 
                     <span className="font-medium" style={{ color: t.p[700] }}>
                       {ex.name}
                     </span>
-                    <span className="text-gray-400">
-                      {ex.series}×{ex.reps} · {ex.equipment}
-                    </span>
+                    {(ex.series || ex.reps || ex.equipment) && (
+                      <span className="text-gray-400">
+                        {[ex.series && ex.reps ? `${ex.series}x${ex.reps}` : null, ex.equipment].filter(Boolean).join(" - ")}
+                      </span>
+                    )}
                   </div>
                 ))}
                 {ev.clinicalNotes && (

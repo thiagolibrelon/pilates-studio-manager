@@ -112,9 +112,9 @@ export interface Expense {
 
 export interface Exercise {
   name: string;
-  series: number;
-  reps: number;
-  equipment: string;
+  series?: number;
+  reps?: number;
+  equipment?: string;
 }
 
 export interface Evolution {

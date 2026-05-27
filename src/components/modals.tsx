@@ -16,25 +16,27 @@ interface EvoFormProps {
 }
 
 export function EvoForm({ pending, student, schedule, classTypes, onSave, onClose, t }: EvoFormProps) {
-  const [exs, setExs] = useState([{ name: "", series: 3, reps: 10, equipment: classTypes[0] || "Reformer" }]);
+  const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [sig, setSig] = useState<string | null>(null);
 
-  const updEx = (i: number, k: string, v: any) => setExs((p) => p.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
+  const toggleExercise = (name: string) => {
+    setSelectedExercises((prev) => (prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]));
+  };
 
   const save = () => {
     if (!sig) {
       alert("Assine antes de salvar.");
       return;
     }
-    if (exs.some((e) => !e.name)) {
-      alert("Preencha todos os exercícios.");
+    if (selectedExercises.length === 0) {
+      alert("Marque ao menos um exercicio.");
       return;
     }
     onSave({
       sessionId: pending.sessionId,
       studentId: pending.studentId,
-      exercises: exs,
+      exercises: selectedExercises.map((name) => ({ name })),
       clinicalNotes: notes,
       signature: sig,
       instructor: "Maria Costa",
@@ -55,64 +57,37 @@ export function EvoForm({ pending, student, schedule, classTypes, onSave, onClos
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2">
               <span className="text-sm font-semibold" style={{ color: t.p[700] }}>
-                Exercícios
+                Exercicios
               </span>
-              <button
-                onClick={() => setExs((p) => [...p, { name: "", series: 3, reps: 10, equipment: classTypes[0] || "Reformer" }])}
-                className="text-xs px-2 py-1 rounded-lg text-white transition-all"
-                style={{ background: t.p[500] }}
-              >
-                + Add
-              </button>
+              <p className="text-xs text-gray-400 mt-0.5">Marque os tipos trabalhados nesta aula.</p>
             </div>
-            {exs.map((ex, i) => (
-              <div key={i} className="rounded-xl p-3 mb-2 space-y-2" style={{ background: t.p[50] }}>
-                <div className="flex gap-2">
-                  <input
-                    value={ex.name}
-                    onChange={(e) => updEx(i, "name", e.target.value)}
-                    placeholder="Nome do exercício"
-                    className="flex-1 text-sm border rounded-lg px-2 py-1"
-                    style={{ borderColor: t.p[200] }}
-                  />
-                  {exs.length > 1 && (
-                    <button onClick={() => setExs((p) => p.filter((_, j) => j !== i))} className="text-red-400 text-xs">
-                      ✕
-                    </button>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {[["Séries", "series"], ["Reps", "reps"]].map(([l, k]) => (
-                    <div key={k} className="flex-1">
-                      <label className="text-xs text-gray-400">{l}</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={ex[k as keyof typeof ex]}
-                        onChange={(e) => updEx(i, k, +e.target.value)}
-                        className="w-full text-sm border rounded-lg px-2 py-1"
-                        style={{ borderColor: t.p[200] }}
-                      />
-                    </div>
-                  ))}
-                  <div className="flex-1">
-                    <label className="text-xs text-gray-400">Equip.</label>
-                    <select
-                      value={ex.equipment}
-                      onChange={(e) => updEx(i, "equipment", e.target.value)}
-                      className="w-full text-sm border rounded-lg px-2 py-1 bg-white"
-                      style={{ borderColor: t.p[200] }}
-                    >
-                      {classTypes.map((ct) => (
-                        <option key={ct}>{ct}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            ))}
+            <div className="grid grid-cols-2 gap-2">
+              {classTypes.map((type) => {
+                const checked = selectedExercises.includes(type);
+                return (
+                  <label
+                    key={type}
+                    className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm cursor-pointer transition-all"
+                    style={{
+                      borderColor: checked ? t.p[400] : t.p[100],
+                      background: checked ? t.p[50] : "white",
+                      color: checked ? t.p[700] : "#4b5563",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleExercise(type)}
+                      className="w-4 h-4"
+                      style={{ accentColor: t.p[500] }}
+                    />
+                    <span className="font-medium">{type}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
           <TA label="Observações Clínicas" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Evolução, queixas, adaptações..." />
           <SigCanvas
