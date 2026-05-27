@@ -66,9 +66,20 @@ export function Dashboard({ t, students, payments, expenses, schedules, sessions
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: t.p[800] }}>
-          Olá, Camila 4\238121-F! {t.emoji}
-        </h1>
+        <h1 className="text-2xl font-bold leading-snug" style={{ color: t.p[800] }}>
+          {new Date().getHours() < 12
+          ? "Bom dia"
+          : new Date().getHours() < 18
+          ? "Boa tarde"
+          : "Boa noite"}
+          , Camila!! {t.emoji}
+
+          <br />
+
+          <span className="text-base font-medium text-gray-500">
+            CREFITO: 4/238121-F
+          </span>
+      </h1>
         <p className="text-sm text-gray-400">
           {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </p>
