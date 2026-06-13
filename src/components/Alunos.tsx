@@ -16,11 +16,13 @@ export function Alunos({ t, students, payments, plans, onSelectStudent }: Alunos
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("Todos");
 
-  const filtered = students.filter(
-    (s) =>
-      (s.name.toLowerCase().includes(search.toLowerCase()) || s.cpf.includes(search)) &&
-      (filter === "Todos" || s.status === filter)
-  );
+  const filtered = students
+    .filter(
+      (s) =>
+        (s.name.toLowerCase().includes(search.toLowerCase()) || s.cpf.includes(search)) &&
+        (filter === "Todos" || s.status === filter)
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   return (
     <div className="space-y-4">

@@ -52,10 +52,10 @@ export default function App() {
   const [evolutions, setEvolutions] = useStoredState<Evolution[]>("pilates.evolutions", INIT_EVOLUTIONS);
   const [payments, setPayments] = useStoredState<Payment[]>("pilates.payments", INIT_PAYMENTS);
   const [expenses, setExpenses] = useStoredState<Expense[]>("pilates.expenses", INIT_EXPENSES);
-  const [presence, /*setPresence*/] = useState<Presence[]>(INIT_PRESENCE);
+  const [presence, setPresence] = useStoredState<Presence[]>("pilates.presence", INIT_PRESENCE);
 
   // ── Modals ──────────────────────────────────────────────────────────────────
-  const [evoModal, setEvoModal] = useState<PendingEvolution | null>(null);
+  const [evoModal, setEvoModal] = useState<{ pending: PendingEvolution; existingEvo?: Evolution } | null>(null);
   const [reciboModal, setReciboModal] = useState<{ payment: Payment; student: Student; plan: Plan | undefined } | null>(null);
 
   // ── Navigation Helper ───────────────────────────────────────────────────────
@@ -85,22 +85,51 @@ export default function App() {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleSaveEvo = (data: any) => {
-    const { sessionId, studentId, ...rest } = data;
-    const ses = sessions.find((s) => s.id === sessionId);
+    const { sessionId, studentId, existingEvoId, day, ...rest } = data;
 
-    setEvolutions((prev) => [{ id: "ev" + uid(), scheduleId: ses?.scheduleId || "", day: ses?.day || "", studentId, ...rest, editHistory: [] }, ...prev]);
-
-    setSessions((prev) =>
-      prev.map((s) =>
-        s.id === sessionId ? { ...s, evolved: [...(s.evolved || []), studentId], pendingEvos: (s.pendingEvos || []).filter((id) => id !== studentId) } : s
-      )
-    );
+    if (existingEvoId) {
+      setEvolutions((prev) =>
+        prev.map((e) =>
+          e.id === existingEvoId
+            ? { ...e, day: day || e.day, ...rest, editHistory: [...(e.editHistory || []), e.createdAt] }
+            : e
+        )
+      );
+    } else {
+      const ses = sessionId ? sessions.find((s) => s.id === sessionId) : null;
+      setEvolutions((prev) => [
+        {
+          id: "ev" + uid(),
+          scheduleId: ses?.scheduleId || "",
+          day: day || ses?.day || TODAY,
+          studentId,
+          ...rest,
+          editHistory: [],
+        },
+        ...prev,
+      ]);
+      if (ses && sessionId) {
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionId
+              ? { ...s, evolved: [...(s.evolved || []), studentId], pendingEvos: (s.pendingEvos || []).filter((id) => id !== studentId) }
+              : s
+          )
+        );
+      }
+    }
 
     setEvoModal(null);
   };
 
-  const handlePayment = (payId: string, method: string) => {
-    setPayments((prev) => prev.map((p) => (p.id === payId ? { ...p, status: "Pago", method, paidAt: TODAY } : p)));
+  const handlePayment = (payId: string, method: string, amount?: number) => {
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === payId
+          ? { ...p, status: "Pago", method, paidAt: TODAY, ...(amount !== undefined ? { amount } : {}) }
+          : p
+      )
+    );
 
     // Update student's firstPaymentDate if this is their first payment
     const pay = payments.find((p) => p.id === payId);
@@ -138,7 +167,37 @@ export default function App() {
   };
 
   const handleUpdateSession = (session: Session) => {
+    const oldSession = sessions.find((s) => s.id === session.id);
     setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
+
+    if (!oldSession) return;
+    const changed: Presence[] = [];
+    Object.entries(session.presences).forEach(([studentId, entry]) => {
+      const oldStatus = oldSession.presences[studentId]?.status;
+      if (entry.status !== null && entry.status !== oldStatus) {
+        changed.push({
+          id: "ph" + uid(),
+          studentId,
+          day: session.day,
+          scheduleId: session.scheduleId,
+          status: entry.status as Presence["status"],
+          type: entry.type,
+        });
+      }
+    });
+    if (changed.length > 0) {
+      setPresence((prev) => {
+        let updated = [...prev];
+        changed.forEach((c) => {
+          const idx = updated.findIndex(
+            (p) => p.studentId === c.studentId && p.day === c.day && p.scheduleId === c.scheduleId
+          );
+          if (idx >= 0) updated[idx] = { ...updated[idx], status: c.status };
+          else updated.push(c);
+        });
+        return updated;
+      });
+    }
   };
 
   const dateForWeekday = (weekday: string) => {
@@ -268,7 +327,7 @@ export default function App() {
             allPending={allPending}
             students={students}
             schedules={schedules}
-            onOpenEvoModal={setEvoModal}
+            onOpenEvoModal={(pend) => setEvoModal({ pending: pend })}
             onViewFicha={(id) => nav("ficha", id)}
           />
         )}
@@ -316,7 +375,7 @@ export default function App() {
             onUpdateAnamnese={handleUpdateAnamnese}
             onUpdateEnrollments={setEnrollments}
             onNavigate={nav}
-            onOpenEvoModal={setEvoModal}
+            onOpenEvoModal={(pend, existingEvo) => setEvoModal({ pending: pend, existingEvo })}
             onOpenReciboModal={setReciboModal}
             onPayment={handlePayment}
           />
@@ -362,9 +421,10 @@ export default function App() {
 
       {evoModal && (
         <EvoForm
-          pending={evoModal}
-          student={gS(evoModal.studentId)}
-          schedule={evoModal.schedule}
+          pending={evoModal.pending}
+          existingEvo={evoModal.existingEvo}
+          student={gS(evoModal.pending.studentId)}
+          schedule={evoModal.pending.schedule}
           classTypes={classTypes}
           onSave={handleSaveEvo}
           onClose={() => setEvoModal(null)}

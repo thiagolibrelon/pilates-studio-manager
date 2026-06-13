@@ -89,6 +89,7 @@ export const THEMES: Themes = {
 export const INIT_CLASS_TYPES = ["Reformer", "Mat", "Cadillac", "Chair", "Barrel", "Funcional", "Solo"];
 
 export const INIT_PLANS: Plan[] = [
+  { id: "p0", name: "Mensal 1x/semana", value: 180, classesPerMonth: 4, tenure: "mensal" },
   { id: "p1", name: "Mensal 2x/semana", value: 280, classesPerMonth: 8, tenure: "mensal" },
   { id: "p2", name: "Mensal 3x/semana", value: 380, classesPerMonth: 12, tenure: "mensal" },
   { id: "p3", name: "Mensal Ilimitado", value: 480, classesPerMonth: 20, tenure: "mensal" },

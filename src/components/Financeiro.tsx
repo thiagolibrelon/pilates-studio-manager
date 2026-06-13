@@ -9,7 +9,7 @@ interface FinanceiroProps {
   expenses: Expense[];
   students: Student[];
   plans: Plan[];
-  onPayment: (paymentId: string, method: string) => void;
+  onPayment: (paymentId: string, method: string, amount?: number) => void;
   onOpenReciboModal: (data: { payment: Payment; student: Student; plan: Plan | undefined }) => void;
   onUpdatePlans: (plans: Plan[]) => void;
   onUpdateExpenses: (expenses: Expense[]) => void;
@@ -41,6 +41,7 @@ export function Financeiro({
   const [tab, setTab] = useState<FinanceiroTab>("pagamentos");
   const [month, setMonth] = useState(TODAY.slice(0, 7));
   const [expenseForm, setExpenseForm] = useState<ExpenseForm | null>(null);
+  const [payConfirm, setPayConfirm] = useState<{ payId: string; method: string; amount: string; studentName: string } | null>(null);
   const [planForm, setPlanForm] = useState<{
     id: string | null;
     name: string;
@@ -224,8 +225,13 @@ export function Financeiro({
                   </Btn>
                 ) : (
                   <div className="mt-3 flex gap-2">
-                    {["PIX", "Dinheiro", "Cartao"].map((m) => (
-                      <button key={m} onClick={() => onPayment(p.id, m)} className="flex-1 py-1.5 text-xs rounded-lg font-medium text-white transition-all" style={{ background: t.p[500] }}>
+                    {["PIX", "Dinheiro", "Cartão"].map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setPayConfirm({ payId: p.id, method: m, amount: String(p.amount), studentName: s.name })}
+                        className="flex-1 py-1.5 text-xs rounded-lg font-medium text-white transition-all"
+                        style={{ background: t.p[500] }}
+                      >
                         {m}
                       </button>
                     ))}
@@ -310,6 +316,46 @@ export function Financeiro({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {payConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="p-5 border-b" style={{ borderColor: t.p[100] }}>
+              <h2 className="font-bold text-lg" style={{ color: t.p[800] }}>
+                Confirmar Pagamento
+              </h2>
+              <p className="text-sm text-gray-400">
+                {payConfirm.studentName} · {payConfirm.method}
+              </p>
+            </div>
+            <div className="p-5 space-y-4">
+              <Inp
+                label="Valor recebido (R$) *"
+                type="number"
+                min="0"
+                step="0.01"
+                value={payConfirm.amount}
+                onChange={(e) => setPayConfirm({ ...payConfirm, amount: e.target.value })}
+              />
+            </div>
+            <div className="p-5 border-t flex gap-3" style={{ borderColor: t.p[100] }}>
+              <Btn outline t={t} className="flex-1" onClick={() => setPayConfirm(null)}>
+                Cancelar
+              </Btn>
+              <Btn
+                t={t}
+                className="flex-1"
+                onClick={() => {
+                  onPayment(payConfirm.payId, payConfirm.method, +payConfirm.amount || undefined);
+                  setPayConfirm(null);
+                }}
+              >
+                Confirmar
+              </Btn>
+            </div>
+          </div>
         </div>
       )}
 

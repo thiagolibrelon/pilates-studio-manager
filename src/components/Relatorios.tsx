@@ -133,7 +133,7 @@ function RelResumo({ presence, activeStudents, plans, relMonth, setRelMonth, set
         return h.studentId === s.id && hy === y && hm === m;
       });
       const pres = hist.filter((h) => h.status === "presente").length;
-      const falt = hist.filter((h) => h.status === "falta").length;
+      const falt = hist.filter((h) => h.status === "falta" || h.status === "falta_justificada" || h.status === "falta_nao_justificada").length;
       const rep = hist.filter((h) => h.status === "reposicao").length;
       const plan = gP(s.planId);
       const tot = plan?.classesPerMonth || 0;
@@ -165,7 +165,7 @@ function RelResumo({ presence, activeStudents, plans, relMonth, setRelMonth, set
             style={{ borderColor: "#e5e7eb" }}
           >
             <option value="todos">Todos</option>
-            {activeStudents.map((s) => (
+            {[...activeStudents].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -245,7 +245,7 @@ function RelDetalhe({ studentId, presence, students, plans, schedules, setRelStu
     .sort((a, b) => b.day.localeCompare(a.day));
 
   const pres = rows.filter((h) => h.status === "presente").length;
-  const falt = rows.filter((h) => h.status === "falta").length;
+  const falt = rows.filter((h) => h.status === "falta" || h.status === "falta_justificada" || h.status === "falta_nao_justificada").length;
   const rep = rows.filter((h) => h.status === "reposicao").length;
   const pct = plan && plan.classesPerMonth > 0 ? Math.round((pres / plan.classesPerMonth) * 100) : 0;
   const bc = pct >= 75 ? t.p[500] : pct >= 50 ? "#f59e0b" : "#ef4444";
@@ -297,8 +297,13 @@ function RelDetalhe({ studentId, presence, students, plans, schedules, setRelStu
       {rows.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nenhum registro.</p>}
       {rows.map((h) => {
         const sc = h.scheduleId ? gSc(h.scheduleId) : undefined;
-        const icon = h.status === "presente" ? "✅" : h.status === "falta" ? "❌" : "🔄";
-        const col = h.status === "presente" ? "text-emerald-600" : h.status === "falta" ? "text-red-400" : "text-amber-500";
+        const isFaltaJust = h.status === "falta_justificada";
+        const isFaltaNao = h.status === "falta" || h.status === "falta_nao_justificada";
+        const isRep = h.status === "reposicao";
+        const isPres = h.status === "presente";
+        const icon = isPres ? "✅" : isRep ? "🔄" : isFaltaJust ? "⚠️" : "❌";
+        const col = isPres ? "text-emerald-600" : isRep ? "text-amber-500" : isFaltaJust ? "text-amber-600" : "text-red-400";
+        const label = isPres ? "Presente" : isRep ? "Reposição" : isFaltaJust ? "F. Justificada" : "Falta";
         return (
           <div key={h.id} className="flex items-center justify-between p-3 rounded-xl mb-1 border" style={{ borderColor: "#e5e7eb" }}>
             <div className="flex items-center gap-3">
@@ -310,7 +315,7 @@ function RelDetalhe({ studentId, presence, students, plans, schedules, setRelStu
                 <p className="text-xs text-gray-400">{sc?.time} — {sc?.type}</p>
               </div>
             </div>
-            <span className={`text-xs font-medium capitalize ${col}`}>{h.status}</span>
+            <span className={`text-xs font-medium ${col}`}>{label}</span>
           </div>
         );
       })}

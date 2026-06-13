@@ -82,12 +82,14 @@ export interface Enrollment {
   days: string[];
 }
 
+export type PresenceStatus = "presente" | "falta_justificada" | "falta_nao_justificada" | "falta" | null;
+
 export interface Presence {
   id: string;
   studentId: string;
   day: string;
   scheduleId: string;
-  status: "presente" | "falta" | "reposicao";
+  status: "presente" | "falta" | "reposicao" | "falta_justificada" | "falta_nao_justificada";
   type: "fixo" | "reposicao" | "wellhub";
 }
 
@@ -131,7 +133,7 @@ export interface Evolution {
 }
 
 export interface PresenceEntry {
-  status: "presente" | "falta" | null;
+  status: PresenceStatus;
   type: "fixo" | "reposicao" | "wellhub";
 }
 

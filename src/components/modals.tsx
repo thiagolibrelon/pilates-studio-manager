@@ -1,12 +1,13 @@
-import type { Theme, Payment, Student, Plan, Schedule, PendingEvolution } from "../types";
-import { Btn, SigCanvas, TA } from "./ui";
-import { fmt, fmtM, MONTHS, vencStr } from "../utils";
+import type { Theme, Payment, Student, Plan, Schedule, PendingEvolution, Evolution } from "../types";
+import { Btn, SigCanvas, TA, Inp } from "./ui";
+import { fmt, fmtM, MONTHS, vencStr, TODAY } from "../utils";
 import { useState } from "react";
 
 // ── Evolution Form Modal ────────────────────────────────────────────────────────────────
 
 interface EvoFormProps {
   pending: PendingEvolution;
+  existingEvo?: Evolution;
   student: Student | undefined;
   schedule: Schedule | undefined;
   classTypes: string[];
@@ -15,17 +16,23 @@ interface EvoFormProps {
   t: Theme;
 }
 
-export function EvoForm({ pending, student, schedule, classTypes, onSave, onClose, t }: EvoFormProps) {
-  const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
-  const [notes, setNotes] = useState("");
+export function EvoForm({ pending, existingEvo, student, schedule, classTypes, onSave, onClose, t }: EvoFormProps) {
+  const [selectedExercises, setSelectedExercises] = useState<string[]>(
+    existingEvo?.exercises.map((e) => e.name) || []
+  );
+  const [notes, setNotes] = useState(existingEvo?.clinicalNotes || "");
   const [sig, setSig] = useState<string | null>(null);
+  const [evoDate, setEvoDate] = useState(existingEvo?.day || pending.day || TODAY);
+
+  const isEditing = !!existingEvo;
 
   const toggleExercise = (name: string) => {
     setSelectedExercises((prev) => (prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]));
   };
 
   const save = () => {
-    if (!sig) {
+    const finalSig = sig || existingEvo?.signature || null;
+    if (!finalSig) {
       alert("Assine antes de salvar.");
       return;
     }
@@ -34,13 +41,15 @@ export function EvoForm({ pending, student, schedule, classTypes, onSave, onClos
       return;
     }
     onSave({
-      sessionId: pending.sessionId,
+      sessionId: isEditing ? "" : pending.sessionId,
       studentId: pending.studentId,
+      existingEvoId: existingEvo?.id || null,
       exercises: selectedExercises.map((name) => ({ name })),
       clinicalNotes: notes,
-      signature: sig,
+      signature: finalSig,
       instructor: "Maria Costa",
-      createdAt: new Date().toISOString(),
+      createdAt: existingEvo?.createdAt || new Date().toISOString(),
+      day: evoDate,
     });
   };
 
@@ -49,13 +58,19 @@ export function EvoForm({ pending, student, schedule, classTypes, onSave, onClos
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl">
         <div className="p-5 border-b" style={{ borderColor: t.p[100] }}>
           <h2 className="font-bold text-lg" style={{ color: t.p[800] }}>
-            Registrar Evolução
+            {isEditing ? "Editar Evolução" : "Registrar Evolução"}
           </h2>
           <p className="text-sm text-gray-400">
-            {student?.name} · {schedule?.time}
+            {student?.name} · {schedule?.time || "—"}
           </p>
         </div>
         <div className="p-5 space-y-4">
+          <Inp
+            label="Data da aula"
+            type="date"
+            value={evoDate}
+            onChange={(e) => setEvoDate(e.target.value)}
+          />
           <div>
             <div className="mb-2">
               <span className="text-sm font-semibold" style={{ color: t.p[700] }}>
@@ -100,6 +115,11 @@ export function EvoForm({ pending, student, schedule, classTypes, onSave, onClos
           {sig && (
             <p className="text-xs font-medium" style={{ color: t.p[500] }}>
               ✅ Assinatura registrada
+            </p>
+          )}
+          {!sig && isEditing && existingEvo?.signature && (
+            <p className="text-xs text-gray-400">
+              Assinatura original mantida. Assine novamente para substituir.
             </p>
           )}
         </div>

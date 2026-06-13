@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { Theme, Student, Plan, Payment, Evolution, Presence, Enrollment, Schedule, Anamnese, PendingEvolution } from "../types";
+import type { Theme, Student, Plan, Payment, Evolution, Presence, Enrollment, Schedule, Anamnese, PendingEvolution, PresenceStatus } from "../types";
 import { Card, Btn, Av, Inp, TA, Sl, Sec, SBadge, TabSwitcher } from "./ui";
 import { fmt, fmtM, WD, vencStr, TODAY, BLANK_ANAM } from "../utils";
 
@@ -20,9 +20,9 @@ interface FichaProps {
   onUpdateAnamnese: (studentId: string, anam: Anamnese) => void;
   onUpdateEnrollments: (enrollments: Enrollment[]) => void;
   onNavigate: (route: string, id?: string | null) => void;
-  onOpenEvoModal: (pend: PendingEvolution) => void;
+  onOpenEvoModal: (pend: PendingEvolution, existingEvo?: Evolution) => void;
   onOpenReciboModal: (data: { payment: Payment; student: Student; plan: Plan | undefined }) => void;
-  onPayment: (paymentId: string, method: string) => void;
+  onPayment: (paymentId: string, method: string, amount?: number) => void;
 }
 
 export function Ficha({
@@ -51,6 +51,7 @@ export function Ficha({
   const lastId = useRef<string | null>(null);
   const [showEnrF, setShowEnrF] = useState(false);
   const [enrForm, setEnrForm] = useState({ scheduleId: "", days: [] as string[] });
+  const [payConfirm, setPayConfirm] = useState<{ payId: string; method: string; amount: string } | null>(null);
 
   const isNew = studentId === "novo";
 
@@ -319,6 +320,16 @@ export function Ficha({
               ))}
             </div>
           )}
+          <div className="flex justify-end">
+            <Btn
+              t={t}
+              onClick={() =>
+                onOpenEvoModal({ sessionId: "", studentId: form.id, day: TODAY })
+              }
+            >
+              + Nova Evolução
+            </Btn>
+          </div>
           {stEvos.length === 0 && stPend.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Nenhuma evolução.</p>}
           {stEvos.map((ev) => (
             <Card key={ev.id} t={t}>
@@ -326,7 +337,16 @@ export function Ficha({
                 <p className="font-semibold text-sm" style={{ color: t.p[800] }}>
                   {fmt(ev.day)}
                 </p>
-                <span className="text-xs text-gray-400">{ev.instructor}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-400">{ev.instructor}</span>
+                  <button
+                    onClick={() => onOpenEvoModal({ sessionId: "", studentId: ev.studentId, day: ev.day }, ev)}
+                    className="text-xs font-medium transition-all"
+                    style={{ color: t.p[500] }}
+                  >
+                    Editar
+                  </button>
+                </div>
               </div>
               {ev.exercises.map((ex, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs p-2 rounded-lg mb-1" style={{ background: t.p[50] }}>
@@ -429,6 +449,44 @@ export function Ficha({
       )}
 
       {/* ── Financeiro ──────────────────────────────────────────────────────── */}
+      {payConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="p-5 border-b" style={{ borderColor: t.p[100] }}>
+              <h2 className="font-bold text-lg" style={{ color: t.p[800] }}>
+                Confirmar Pagamento
+              </h2>
+              <p className="text-sm text-gray-400">{form.name} · {payConfirm.method}</p>
+            </div>
+            <div className="p-5 space-y-4">
+              <Inp
+                label="Valor recebido (R$) *"
+                type="number"
+                min="0"
+                step="0.01"
+                value={payConfirm.amount}
+                onChange={(e) => setPayConfirm({ ...payConfirm, amount: e.target.value })}
+              />
+            </div>
+            <div className="p-5 border-t flex gap-3" style={{ borderColor: t.p[100] }}>
+              <Btn outline t={t} className="flex-1" onClick={() => setPayConfirm(null)}>
+                Cancelar
+              </Btn>
+              <Btn
+                t={t}
+                className="flex-1"
+                onClick={() => {
+                  onPayment(payConfirm.payId, payConfirm.method, +payConfirm.amount || undefined);
+                  setPayConfirm(null);
+                }}
+              >
+                Confirmar
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === "financeiro" && !isNew && (
         <div className="space-y-3">
           {stPays.map((p) => (
@@ -463,7 +521,12 @@ export function Ficha({
               ) : (
                 <div className="mt-3 flex gap-2">
                   {["PIX", "Dinheiro", "Cartão"].map((m) => (
-                    <button key={m} onClick={() => onPayment(p.id, m)} className="flex-1 py-1.5 text-xs rounded-lg font-medium text-white transition-all" style={{ background: t.p[500] }}>
+                    <button
+                      key={m}
+                      onClick={() => setPayConfirm({ payId: p.id, method: m, amount: String(p.amount) })}
+                      className="flex-1 py-1.5 text-xs rounded-lg font-medium text-white transition-all"
+                      style={{ background: t.p[500] }}
+                    >
                       {m}
                     </button>
                   ))}
@@ -503,7 +566,7 @@ function TabPresencasFicha({
     .sort((a, b) => b.day.localeCompare(a.day));
 
   const pres = rows.filter((h) => h.status === "presente").length;
-  const falt = rows.filter((h) => h.status === "falta").length;
+  const falt = rows.filter((h) => h.status === "falta" || h.status === "falta_justificada" || h.status === "falta_nao_justificada").length;
   const rep = rows.filter((h) => h.status === "reposicao").length;
   const plan = plans.find((p) => p.id === planId);
   const tot = plan?.classesPerMonth || 0;
@@ -532,8 +595,12 @@ function TabPresencasFicha({
       {rows.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nenhum registro neste mês.</p>}
       {rows.map((h) => {
         const sc = gSc(h.scheduleId);
-        const icon = h.status === "presente" ? "✅" : h.status === "falta" ? "❌" : "🔄";
-        const col = h.status === "presente" ? "text-emerald-600" : h.status === "falta" ? "text-red-400" : "text-amber-500";
+        const isFaltaJust = h.status === "falta_justificada";
+        const isRep = h.status === "reposicao";
+        const isPres = h.status === "presente";
+        const icon = isPres ? "✅" : isRep ? "🔄" : isFaltaJust ? "⚠️" : "❌";
+        const col = isPres ? "text-emerald-600" : isRep ? "text-amber-500" : isFaltaJust ? "text-amber-600" : "text-red-400";
+        const label = isPres ? "Presente" : isRep ? "Reposição" : isFaltaJust ? "F. Justificada" : "Falta";
         return (
           <div key={h.id} className="flex items-center justify-between p-3 rounded-xl border" style={{ borderColor: "#e5e7eb" }}>
             <div className="flex items-center gap-3">
@@ -543,7 +610,7 @@ function TabPresencasFicha({
                 <p className="text-xs text-gray-400">{sc?.time} — {sc?.type}</p>
               </div>
             </div>
-            <span className={`text-xs font-medium capitalize ${col}`}>{h.status}</span>
+            <span className={`text-xs font-medium ${col}`}>{label}</span>
           </div>
         );
       })}
