@@ -37,6 +37,24 @@ export interface Themes {
   camila: Theme;
 }
 
+// ── Studio Config ──────────────────────────────────────────────────────────────────────────
+
+export interface StudioConfig {
+  studioName: string;
+  professionalName: string;
+  crefito: string;
+  username: string;
+  password: string;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────────────────
+
+export interface ToastItem {
+  id: string;
+  message: string;
+  type: "success" | "error" | "warning" | "info";
+}
+
 // ── Entity Types ──────────────────────────────────────────────────────────────────────────
 
 export interface Student {
@@ -199,4 +217,5 @@ export type Route =
   | "relatorios"
   | "aula"
   | "ficha"
-  | "financeiro";
+  | "financeiro"
+  | "configuracoes";

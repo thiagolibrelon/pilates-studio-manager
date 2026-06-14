@@ -17,29 +17,41 @@ export const MONTHS = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
+export const fmtMonth = (yearMonth: string): string => {
+  const [year, month] = yearMonth.split("-").map(Number);
+  if (!year || !month) return yearMonth;
+  return `${MONTHS[month - 1]} ${year}`;
+};
+
+// ── CSV Export ────────────────────────────────────────────────────────────────────────────
+
+export const downloadCSV = (filename: string, data: (string | number)[][]): void => {
+  const csv = data
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 // ── Vencimento Logic ──────────────────────────────────────────────────────────────────────
 
-/**
- * Returns the day of month for payment due date (based on first payment date)
- */
 export const vencDay = (firstPaymentDate: string | null | undefined): number | null => {
   if (!firstPaymentDate) return null;
   return new Date(firstPaymentDate + "T12:00:00").getDate();
 };
 
-/**
- * Returns a human-readable string for the due date (e.g., "Dia 15 de cada mês")
- */
 export const vencStr = (firstPaymentDate: string | null | undefined): string => {
   const d = vencDay(firstPaymentDate);
   return d ? `Dia ${d} de cada mês` : "—";
 };
 
-/**
- * Calculate days until next due date
- * @param firstPaymentDate - Date of first payment (determines due day)
- * @param referenceDate - Reference date (defaults to TODAY)
- */
 export const daysUntilDue = (
   firstPaymentDate: string | null | undefined,
   referenceDate: string = TODAY
@@ -57,12 +69,9 @@ export const daysUntilDue = (
   return Math.ceil((due.getTime() - today.getTime()) / 86400000);
 };
 
-/**
- * Get the due date for a specific month based on first payment date
- */
 export const getDueDateForMonth = (
   firstPaymentDate: string | null | undefined,
-  yearMonth: string // format: "YYYY-MM"
+  yearMonth: string
 ): string | null => {
   if (!firstPaymentDate) return null;
 
@@ -75,7 +84,7 @@ export const getDueDateForMonth = (
   return dueDate.toISOString().slice(0, 10);
 };
 
-// ── Blank Form Helpers ─────────────────────────────────────────────────────────────────────
+// ── Blank Form Helpers ────────────────────────────────────────────────────────────────────
 
 export const BLANK_ANAM = {
   queixaPrincipal: "",

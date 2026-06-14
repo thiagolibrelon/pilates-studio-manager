@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import type { Theme } from "../types";
+import { useRef, useState, useEffect } from "react";
+import type { Theme, ToastItem } from "../types";
 
 // ── Badge ────────────────────────────────────────────────────────────────────────────────
 
@@ -41,13 +41,86 @@ export function Av({ name, size = 9, t }: { name: string; size?: number; t: Them
 
 // ── Input ─────────────────────────────────────────────────────────────────────────────────
 
-export function Inp({ label, ...p }: { label?: string; [key: string]: any }) {
+export function Inp({ label, required, ...p }: { label?: string; required?: boolean; [key: string]: any }) {
   return (
     <div>
-      {label && <label className="text-xs text-gray-400 block mb-1">{label}</label>}
+      {label && (
+        <label className="text-xs text-gray-500 block mb-1 font-medium">
+          {label}
+          {required && <span className="text-red-400 ml-0.5">*</span>}
+        </label>
+      )}
       <input
         {...p}
-        className="w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-offset-1"
+        className="w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-offset-1 transition-all"
+        style={{ borderColor: "#e5e7eb", ...(p.style || {}) }}
+      />
+    </div>
+  );
+}
+
+// ── Date Input (DD/MM/AAAA) ───────────────────────────────────────────────────────────────
+
+const isoToDisplay = (iso: string): string => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return "";
+  return `${d}/${m}/${y}`;
+};
+
+const displayToISO = (raw: string): string => {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length !== 8) return "";
+  return `${digits.slice(4, 8)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}`;
+};
+
+export function DateInp({
+  label,
+  value,
+  onChange,
+  required,
+}: {
+  label?: string;
+  value: string;
+  onChange: (iso: string) => void;
+  required?: boolean;
+}) {
+  const [display, setDisplay] = useState(() => isoToDisplay(value));
+
+  useEffect(() => {
+    setDisplay(isoToDisplay(value));
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
+    let formatted = digits;
+    if (digits.length > 2) formatted = digits.slice(0, 2) + "/" + digits.slice(2);
+    if (digits.length > 4) formatted = digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+    setDisplay(formatted);
+    if (digits.length === 8) {
+      const iso = displayToISO(formatted);
+      if (iso) onChange(iso);
+    } else if (digits.length === 0) {
+      onChange("");
+    }
+  };
+
+  return (
+    <div>
+      {label && (
+        <label className="text-xs text-gray-500 block mb-1 font-medium">
+          {label}
+          {required && <span className="text-red-400 ml-0.5">*</span>}
+        </label>
+      )}
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="DD/MM/AAAA"
+        value={display}
+        onChange={handleChange}
+        maxLength={10}
+        className="w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-offset-1 transition-all"
         style={{ borderColor: "#e5e7eb" }}
       />
     </div>
@@ -59,11 +132,11 @@ export function Inp({ label, ...p }: { label?: string; [key: string]: any }) {
 export function TA({ label, rows = 2, ...p }: { label?: string; rows?: number; [key: string]: any }) {
   return (
     <div>
-      {label && <label className="text-xs text-gray-400 block mb-1">{label}</label>}
+      {label && <label className="text-xs text-gray-500 block mb-1 font-medium">{label}</label>}
       <textarea
         rows={rows}
         {...p}
-        className="w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-offset-1"
+        className="w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-offset-1 transition-all"
         style={{ borderColor: "#e5e7eb" }}
       />
     </div>
@@ -75,10 +148,10 @@ export function TA({ label, rows = 2, ...p }: { label?: string; rows?: number; [
 export function Sl({ label, children, ...p }: { label?: string; children: React.ReactNode; [key: string]: any }) {
   return (
     <div>
-      {label && <label className="text-xs text-gray-400 block mb-1">{label}</label>}
+      {label && <label className="text-xs text-gray-500 block mb-1 font-medium">{label}</label>}
       <select
         {...p}
-        className="w-full border rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-offset-1"
+        className="w-full border rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-offset-1 transition-all"
         style={{ borderColor: "#e5e7eb" }}
       >
         {children}
@@ -137,7 +210,7 @@ export function Btn({
       <button
         onClick={onClick}
         disabled={disabled}
-        className={`rounded-xl border text-sm py-2 px-4 font-medium disabled:opacity-40 transition-all ${className}`}
+        className={`rounded-xl border text-sm py-2 px-4 font-medium disabled:opacity-40 transition-all hover:opacity-80 ${className}`}
         style={{ borderColor: t.p[200], color: t.p[600], ...style }}
       >
         {children}
@@ -148,11 +221,78 @@ export function Btn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-xl text-white font-semibold text-sm py-2.5 px-4 disabled:opacity-40 transition-all ${className}`}
+      className={`rounded-xl text-white font-semibold text-sm py-2.5 px-4 disabled:opacity-40 transition-all hover:opacity-90 ${className}`}
       style={{ background: t.p[500], ...style }}
     >
       {children}
     </button>
+  );
+}
+
+// ── Empty State ───────────────────────────────────────────────────────────────────────────
+
+export function EmptyState({
+  icon,
+  title,
+  description,
+  t,
+}: {
+  icon: string;
+  title: string;
+  description?: string;
+  t: Theme;
+}) {
+  return (
+    <div className="flex flex-col items-center py-12 text-center">
+      <span className="text-5xl mb-4 opacity-60">{icon}</span>
+      <p className="font-semibold text-sm" style={{ color: t.p[700] }}>
+        {title}
+      </p>
+      {description && (
+        <p className="text-xs text-gray-400 mt-1.5 max-w-xs leading-relaxed">{description}</p>
+      )}
+    </div>
+  );
+}
+
+// ── Toast Container ───────────────────────────────────────────────────────────────────────
+
+const TOAST_ICONS: Record<ToastItem["type"], string> = {
+  success: "✅",
+  error: "❌",
+  warning: "⚠️",
+  info: "ℹ️",
+};
+
+const TOAST_COLORS: Record<ToastItem["type"], string> = {
+  success: "#16a34a",
+  error: "#dc2626",
+  warning: "#d97706",
+  info: "#2563eb",
+};
+
+export function ToastContainer({
+  toasts,
+  onRemove,
+}: {
+  toasts: ToastItem[];
+  onRemove: (id: string) => void;
+}) {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="fixed top-4 inset-x-4 z-[200] flex flex-col gap-2 pointer-events-none max-w-sm mx-auto">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl pointer-events-auto animate-pulse-once"
+          style={{ background: TOAST_COLORS[toast.type], color: "white" }}
+          onClick={() => onRemove(toast.id)}
+        >
+          <span className="text-base shrink-0">{TOAST_ICONS[toast.type]}</span>
+          <p className="text-sm font-medium leading-tight flex-1">{toast.message}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -178,7 +318,7 @@ export function SigCanvas({ onSave, t }: { onSave: (sig: string) => void; t: The
 
   return (
     <div>
-      <p className="text-xs text-gray-400 mb-1">Assinatura do instrutor</p>
+      <p className="text-xs text-gray-500 mb-1 font-medium">Assinatura do instrutor</p>
       <canvas
         ref={ref}
         width={340}
@@ -201,12 +341,8 @@ export function SigCanvas({ onSave, t }: { onSave: (sig: string) => void; t: The
           draw(e, ctx, gp(e, c));
           e.preventDefault();
         }}
-        onMouseUp={() => {
-          dr.current = false;
-        }}
-        onMouseLeave={() => {
-          dr.current = false;
-        }}
+        onMouseUp={() => { dr.current = false; }}
+        onMouseLeave={() => { dr.current = false; }}
         onTouchStart={(e) => {
           dr.current = true;
           const c = ref.current!;
@@ -223,24 +359,22 @@ export function SigCanvas({ onSave, t }: { onSave: (sig: string) => void; t: The
           draw(e, ctx, gp(e, c));
           e.preventDefault();
         }}
-        onTouchEnd={() => {
-          dr.current = false;
-        }}
+        onTouchEnd={() => { dr.current = false; }}
       />
       <div className="flex gap-2 mt-2">
         <button
           onClick={() => ref.current?.getContext("2d")?.clearRect(0, 0, 340, 80)}
-          className="text-xs px-3 py-1 rounded-lg border transition-all"
+          className="text-xs px-3 py-1 rounded-lg border transition-all hover:opacity-80"
           style={{ borderColor: t.p[200], color: t.p[600] }}
         >
           Limpar
         </button>
         <button
           onClick={() => onSave(ref.current!.toDataURL())}
-          className="text-xs px-3 py-1 rounded-lg text-white transition-all"
+          className="text-xs px-3 py-1 rounded-lg text-white transition-all hover:opacity-90"
           style={{ background: t.p[500] }}
         >
-          Salvar
+          Confirmar Assinatura
         </button>
       </div>
     </div>

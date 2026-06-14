@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { Theme, Student, Plan, Payment, Evolution, Presence, Enrollment, Schedule, Anamnese, PendingEvolution, PresenceStatus } from "../types";
-import { Card, Btn, Av, Inp, TA, Sl, Sec, SBadge, TabSwitcher } from "./ui";
+import { Card, Btn, Av, Inp, DateInp, TA, Sl, Sec, SBadge, TabSwitcher } from "./ui";
 import { fmt, fmtM, WD, vencStr, TODAY, BLANK_ANAM } from "../utils";
 
 interface FichaProps {
@@ -23,6 +23,7 @@ interface FichaProps {
   onOpenEvoModal: (pend: PendingEvolution, existingEvo?: Evolution) => void;
   onOpenReciboModal: (data: { payment: Payment; student: Student; plan: Plan | undefined }) => void;
   onPayment: (paymentId: string, method: string, amount?: number) => void;
+  onToast: (msg: string, type?: "success" | "error" | "warning") => void;
 }
 
 export function Ficha({
@@ -45,6 +46,7 @@ export function Ficha({
   onOpenEvoModal,
   onOpenReciboModal,
   onPayment,
+  onToast,
 }: FichaProps) {
   const [tab, setTab] = useState<"evolucoes" | "presencas" | "anamnese" | "horarios" | "financeiro" | "dados">("evolucoes");
   const [form, setForm] = useState<Student | null>(null);
@@ -105,8 +107,8 @@ export function Ficha({
   const updA = (k: string, v: any) => onUpdateAnamnese(form.id, { ...anam, [k]: v });
 
   const saveForm = () => {
-    if (!form.name || !form.cpf) {
-      alert("Nome e CPF obrigatórios.");
+    if (!form.name) {
+      onToast("Nome é obrigatório.", "warning");
       return;
     }
     if (isNew) {
@@ -117,10 +119,10 @@ export function Ficha({
       setEnrForm({ scheduleId: schedules[0]?.id || "", days: [] });
       setShowEnrF(true);
       onNavigate("ficha", id);
-      alert("Aluno cadastrado. Agora vincule uma turma para ele aparecer na matriz do inicio.");
+      onToast("Aluno cadastrado! Vincule uma turma para ele aparecer na agenda.");
     } else {
       onUpdateStudent(form);
-      alert("✅ Salvo!");
+      onToast("Dados salvos com sucesso!");
     }
   };
 
@@ -135,19 +137,19 @@ export function Ficha({
 
   const saveEnr = () => {
     if (!enrForm.scheduleId || enrForm.days.length === 0) {
-      alert("Selecione turma e ao menos um dia.");
+      onToast("Selecione turma e ao menos um dia.", "warning");
       return;
     }
     const sc = gSc(enrForm.scheduleId);
     for (const day of enrForm.days) {
       const o = occ(enrForm.scheduleId, day);
       if (o && o.occupied >= o.max) {
-        alert(`${sc?.time} em ${day} lotada.`);
+        onToast(`${sc?.time} em ${day} está lotada.`, "warning");
         return;
       }
     }
     if (enrollments.find((e) => e.studentId === form.id && e.scheduleId === enrForm.scheduleId)) {
-      alert("Já vinculado.");
+      onToast("Aluno já vinculado a esta turma.", "warning");
       return;
     }
     onUpdateEnrollments([
@@ -205,19 +207,18 @@ export function Ficha({
       {/* ── Dados ────────────────────────────────────────────────────────────── */}
       {tab === "dados" && (
         <div className="rounded-2xl p-5 border shadow-sm space-y-3" style={{ background: t.card, borderColor: t.border }}>
-          <Inp label="Nome *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Inp label="CPF *" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
-          <Inp label="Data de Nascimento" type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+          <Inp label="Nome *" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <Inp label="CPF" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
+          <DateInp label="Data de Nascimento" value={form.dob} onChange={(v) => setForm({ ...form, dob: v })} />
           <Inp label="WhatsApp" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
           <Inp label="Telefone Emergência" value={form.emergency} onChange={(e) => setForm({ ...form, emergency: e.target.value })} />
           <Inp label="E-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Inp label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-          <Inp label="Data de Matrícula" type="date" value={form.enrolled} onChange={(e) => setForm({ ...form, enrolled: e.target.value })} />
-          <Inp
+          <DateInp label="Data de Matrícula" value={form.enrolled} onChange={(v) => setForm({ ...form, enrolled: v })} />
+          <DateInp
             label="Data do Primeiro Pagamento"
-            type="date"
             value={form.firstPaymentDate || ""}
-            onChange={(e) => setForm({ ...form, firstPaymentDate: e.target.value || null })}
+            onChange={(v) => setForm({ ...form, firstPaymentDate: v || null })}
           />
           <p className="text-xs text-gray-400">Define o dia de vencimento mensal</p>
           <Sl label="Plano" value={form.planId} onChange={(e) => setForm({ ...form, planId: e.target.value })}>
@@ -296,7 +297,7 @@ export function Ficha({
           <Sec title="Observações" col={t.p[600]}>
             <TA value={anam.observacoes} onChange={(e) => updA("observacoes", e.target.value)} rows={3} placeholder="Observações gerais..." />
           </Sec>
-          <Btn t={t} className="w-full" onClick={() => alert("Anamnese salva!")}>
+          <Btn t={t} className="w-full" onClick={() => onToast("Anamnese salva!")}>
             Salvar Anamnese
           </Btn>
         </div>

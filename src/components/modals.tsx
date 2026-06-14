@@ -1,5 +1,5 @@
 import type { Theme, Payment, Student, Plan, Schedule, PendingEvolution, Evolution } from "../types";
-import { Btn, SigCanvas, TA, Inp } from "./ui";
+import { Btn, SigCanvas, TA, Inp, DateInp } from "./ui";
 import { fmt, fmtM, MONTHS, vencStr, TODAY } from "../utils";
 import { useState } from "react";
 
@@ -11,12 +11,14 @@ interface EvoFormProps {
   student: Student | undefined;
   schedule: Schedule | undefined;
   classTypes: string[];
+  instructorName: string;
   onSave: (data: any) => void;
   onClose: () => void;
+  onToast: (msg: string, type?: "success" | "error" | "warning") => void;
   t: Theme;
 }
 
-export function EvoForm({ pending, existingEvo, student, schedule, classTypes, onSave, onClose, t }: EvoFormProps) {
+export function EvoForm({ pending, existingEvo, student, schedule, classTypes, instructorName, onSave, onClose, onToast, t }: EvoFormProps) {
   const [selectedExercises, setSelectedExercises] = useState<string[]>(
     existingEvo?.exercises.map((e) => e.name) || []
   );
@@ -33,11 +35,11 @@ export function EvoForm({ pending, existingEvo, student, schedule, classTypes, o
   const save = () => {
     const finalSig = sig || existingEvo?.signature || null;
     if (!finalSig) {
-      alert("Assine antes de salvar.");
+      onToast("Assine antes de salvar.", "warning");
       return;
     }
     if (selectedExercises.length === 0) {
-      alert("Marque ao menos um exercicio.");
+      onToast("Marque ao menos um exercício.", "warning");
       return;
     }
     onSave({
@@ -47,7 +49,7 @@ export function EvoForm({ pending, existingEvo, student, schedule, classTypes, o
       exercises: selectedExercises.map((name) => ({ name })),
       clinicalNotes: notes,
       signature: finalSig,
-      instructor: "Maria Costa",
+      instructor: instructorName,
       createdAt: existingEvo?.createdAt || new Date().toISOString(),
       day: evoDate,
     });
@@ -65,11 +67,10 @@ export function EvoForm({ pending, existingEvo, student, schedule, classTypes, o
           </p>
         </div>
         <div className="p-5 space-y-4">
-          <Inp
+          <DateInp
             label="Data da aula"
-            type="date"
             value={evoDate}
-            onChange={(e) => setEvoDate(e.target.value)}
+            onChange={(v) => setEvoDate(v)}
           />
           <div>
             <div className="mb-2">
@@ -108,7 +109,7 @@ export function EvoForm({ pending, existingEvo, student, schedule, classTypes, o
           <SigCanvas
             onSave={(s) => {
               setSig(s);
-              alert("Assinatura capturada!");
+              onToast("Assinatura capturada!");
             }}
             t={t}
           />
@@ -142,16 +143,17 @@ interface ReciboModalProps {
   payment: Payment;
   student: Student;
   plan: Plan | undefined;
+  studioName: string;
   t: Theme;
   onClose: () => void;
 }
 
-export function ReciboModal({ payment, student, plan, t, onClose }: ReciboModalProps) {
+export function ReciboModal({ payment, student, plan, studioName, t, onClose }: ReciboModalProps) {
   const month = payment.month ? `${MONTHS[+payment.month.split("-")[1] - 1]}/${payment.month.split("-")[0]}` : "";
 
   const texto = [
     "✅ *Recibo de Pagamento*",
-    "🏋️ Pilates Studio Manager",
+    studioName,
     "",
     `👤 Aluno: ${student.name}`,
     `📋 Plano: ${plan?.name || "—"}`,
@@ -202,73 +204,3 @@ export function ReciboModal({ payment, student, plan, t, onClose }: ReciboModalP
   );
 }
 
-// ── Theme Modal ────────────────────────────────────────────────────────────────────────────
-
-interface ThemeModalProps {
-  current: string;
-  onChange: (key: string) => void;
-  onClose: () => void;
-  t: Theme;
-  themes: Record<string, Theme>;
-}
-
-export function ThemeModal({ current, onChange, onClose, t, themes }: ThemeModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
-        <div className="p-5 border-b" style={{ borderColor: t.p[100] }}>
-          <h2 className="font-bold text-lg" style={{ color: t.p[800] }}>
-            🎨 Tema Visual
-          </h2>
-        </div>
-        <div className="p-5 space-y-3">
-          {Object.entries(themes).map(([key, th]) => {
-            const active = current === key;
-            return (
-              <button
-                key={key}
-                onClick={() => {
-                  onChange(key);
-                  onClose();
-                }}
-                className="w-full rounded-2xl p-4 border-2 text-left transition-all hover:shadow-md"
-                style={{ borderColor: active ? th.p[500] : th.border, background: active ? th.p[50] : "white" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1">
-                    {[th.p[800], th.p[500], th.p[200]].map((c, i) => (
-                      <div key={i} className="w-5 h-10 rounded-lg" style={{ background: c }} />
-                    ))}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span>{th.emoji}</span>
-                      <span className="font-bold text-sm" style={{ color: th.p[800] }}>
-                        {th.name}
-                      </span>
-                      {active && (
-                        <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ background: th.p[500] }}>
-                          Ativo
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-1.5 mt-2">
-                      {[th.bg, th.border, th.p[300], th.p[500], th.p[800]].map((c, i) => (
-                        <div key={i} className="w-5 h-5 rounded-full border border-gray-200" style={{ background: c }} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <div className="p-5 border-t" style={{ borderColor: t.p[100] }}>
-          <Btn outline t={t} className="w-full" onClick={onClose}>
-            Fechar
-          </Btn>
-        </div>
-      </div>
-    </div>
-  );
-}

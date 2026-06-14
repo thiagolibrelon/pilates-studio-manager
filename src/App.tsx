@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react";
-import type { Route, ThemeKey, Student, Plan, Schedule, Enrollment, Session, Evolution, Payment, Expense, Presence, Anamnese, PendingEvolution } from "./types";
-import { THEMES, INIT_STUDENTS, INIT_PLANS, INIT_SCHEDULES, INIT_ENROLLMENTS, INIT_SESSIONS, INIT_EVOLUTIONS, INIT_PAYMENTS, INIT_EXPENSES, INIT_PRESENCE, INIT_CLASS_TYPES } from "./data";
+import { useEffect, useState, useCallback } from "react";
+import type {
+  Route, ThemeKey, Student, Plan, Schedule, Enrollment, Session,
+  Evolution, Payment, Expense, Presence, Anamnese, PendingEvolution,
+  StudioConfig, ToastItem,
+} from "./types";
+import {
+  THEMES, INIT_STUDENTS, INIT_PLANS, INIT_SCHEDULES, INIT_ENROLLMENTS,
+  INIT_SESSIONS, INIT_EVOLUTIONS, INIT_PAYMENTS, INIT_EXPENSES,
+  INIT_PRESENCE, INIT_CLASS_TYPES, DEFAULT_STUDIO_CONFIG,
+} from "./data";
 import { uid, TODAY, WD } from "./utils";
-import { Av } from "./components/ui";
-import { EvoForm, ReciboModal, ThemeModal } from "./components/modals";
+import { Av, ToastContainer } from "./components/ui";
+import { EvoForm, ReciboModal } from "./components/modals";
 import { Dashboard } from "./components/Dashboard";
 import { Turmas } from "./components/Turmas";
 import { Alunos } from "./components/Alunos";
@@ -12,6 +20,8 @@ import { Relatorios } from "./components/Relatorios";
 import { Aula } from "./components/Aula";
 import { Ficha } from "./components/Ficha";
 import { Financeiro } from "./components/Financeiro";
+import { Login } from "./components/Login";
+import { Configuracoes } from "./components/Configuracoes";
 
 const loadStored = <T,>(key: string, fallback: T): T => {
   if (typeof window === "undefined") return fallback;
@@ -25,40 +35,78 @@ const loadStored = <T,>(key: string, fallback: T): T => {
 
 const useStoredState = <T,>(key: string, fallback: T) => {
   const [value, setValue] = useState<T>(() => loadStored(key, fallback));
-
   useEffect(() => {
     window.localStorage.setItem(key, JSON.stringify(value));
   }, [key, value]);
-
   return [value, setValue] as const;
 };
 
 export default function App() {
-  // ── Theme & Navigation ──────────────────────────────────────────────────────
+  // ── Auth ─────────────────────────────────────────────────────────────────────
+  const [config, setConfig] = useStoredState<StudioConfig | null>("pilates.config", null);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem("pilates.session") === "1");
+
+  const handleSetup = (cfg: StudioConfig) => {
+    setConfig(cfg);
+    setIsLoggedIn(true);
+    sessionStorage.setItem("pilates.session", "1");
+  };
+
+  const handleLogin = (username: string, password: string): boolean => {
+    if (!config) return false;
+    if (username === config.username && password === config.password) {
+      setIsLoggedIn(true);
+      sessionStorage.setItem("pilates.session", "1");
+      return true;
+    }
+    return false;
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    sessionStorage.removeItem("pilates.session");
+    setRoute("dashboard");
+  };
+
+  const handleUpdateConfig = (cfg: StudioConfig) => {
+    setConfig(cfg);
+  };
+
+  // ── Theme & Navigation ────────────────────────────────────────────────────────
   const [themeKey, setThemeKey] = useStoredState<ThemeKey>("pilates.theme", "sage");
   const t = THEMES[themeKey];
-  const [showThemeModal, setShowThemeModal] = useState(false);
   const [route, setRoute] = useState<Route>("dashboard");
   const [routeParam, setRouteParam] = useState<string | null>(null);
 
-  // ── State ────────────────────────────────────────────────────────────────────
-  const [students, setStudents] = useStoredState<Student[]>("pilates.students", INIT_STUDENTS);
+  // ── State ─────────────────────────────────────────────────────────────────────
+  const [students, setStudents] = useStoredState<Student[]>("pilates.students", INIT_STUDENTS as Student[]);
   const [anamneses, setAnamneses] = useStoredState<Record<string, Anamnese>>("pilates.anamneses", {});
   const [plans, setPlans] = useStoredState<Plan[]>("pilates.plans", INIT_PLANS);
   const [classTypes, setClassTypes] = useStoredState<string[]>("pilates.classTypes", INIT_CLASS_TYPES);
   const [schedules, setSchedules] = useStoredState<Schedule[]>("pilates.schedules", INIT_SCHEDULES);
-  const [enrollments, setEnrollments] = useStoredState<Enrollment[]>("pilates.enrollments", INIT_ENROLLMENTS);
-  const [sessions, setSessions] = useStoredState<Session[]>("pilates.sessions", INIT_SESSIONS);
-  const [evolutions, setEvolutions] = useStoredState<Evolution[]>("pilates.evolutions", INIT_EVOLUTIONS);
-  const [payments, setPayments] = useStoredState<Payment[]>("pilates.payments", INIT_PAYMENTS);
-  const [expenses, setExpenses] = useStoredState<Expense[]>("pilates.expenses", INIT_EXPENSES);
-  const [presence, setPresence] = useStoredState<Presence[]>("pilates.presence", INIT_PRESENCE);
+  const [enrollments, setEnrollments] = useStoredState<Enrollment[]>("pilates.enrollments", INIT_ENROLLMENTS as Enrollment[]);
+  const [sessions, setSessions] = useStoredState<Session[]>("pilates.sessions", INIT_SESSIONS as Session[]);
+  const [evolutions, setEvolutions] = useStoredState<Evolution[]>("pilates.evolutions", INIT_EVOLUTIONS as Evolution[]);
+  const [payments, setPayments] = useStoredState<Payment[]>("pilates.payments", INIT_PAYMENTS as Payment[]);
+  const [expenses, setExpenses] = useStoredState<Expense[]>("pilates.expenses", INIT_EXPENSES as Expense[]);
+  const [presence, setPresence] = useStoredState<Presence[]>("pilates.presence", INIT_PRESENCE as Presence[]);
 
-  // ── Modals ──────────────────────────────────────────────────────────────────
+  // ── Toasts ────────────────────────────────────────────────────────────────────
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const addToast = useCallback((message: string, type: ToastItem["type"] = "success") => {
+    const id = uid();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  }, []);
+
+  const removeToast = (id: string) => setToasts((prev) => prev.filter((t) => t.id !== id));
+
+  // ── Modals ────────────────────────────────────────────────────────────────────
   const [evoModal, setEvoModal] = useState<{ pending: PendingEvolution; existingEvo?: Evolution } | null>(null);
   const [reciboModal, setReciboModal] = useState<{ payment: Payment; student: Student; plan: Plan | undefined } | null>(null);
 
-  // ── Navigation Helper ───────────────────────────────────────────────────────
+  // ── Navigation ────────────────────────────────────────────────────────────────
   const nav = (r: string, p: string | null = null) => {
     setRoute(r as Route);
     setRouteParam(p);
@@ -82,11 +130,10 @@ export default function App() {
 
   const pendingCount = allPending.length;
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
+  // ── Handlers ─────────────────────────────────────────────────────────────────
 
   const handleSaveEvo = (data: any) => {
     const { sessionId, studentId, existingEvoId, day, ...rest } = data;
-
     if (existingEvoId) {
       setEvolutions((prev) =>
         prev.map((e) =>
@@ -95,6 +142,7 @@ export default function App() {
             : e
         )
       );
+      addToast("Evolução atualizada com sucesso!");
     } else {
       const ses = sessionId ? sessions.find((s) => s.id === sessionId) : null;
       setEvolutions((prev) => [
@@ -117,8 +165,8 @@ export default function App() {
           )
         );
       }
+      addToast("Evolução registrada com sucesso!");
     }
-
     setEvoModal(null);
   };
 
@@ -130,14 +178,13 @@ export default function App() {
           : p
       )
     );
-
-    // Update student's firstPaymentDate if this is their first payment
     const pay = payments.find((p) => p.id === payId);
     if (pay) {
       setStudents((prev) =>
         prev.map((s) => (s.id === pay.studentId && !s.firstPaymentDate ? { ...s, firstPaymentDate: TODAY } : s))
       );
     }
+    addToast("Pagamento confirmado!");
   };
 
   const handleUpdateStudent = (student: Student) => {
@@ -146,8 +193,6 @@ export default function App() {
 
   const handleAddStudent = (student: Student) => {
     setStudents((prev) => [...prev, student]);
-
-    // Create initial payment for the current month
     const plan = gP(student.planId);
     const currentMonth = TODAY.slice(0, 7);
     const newPayment: Payment = {
@@ -169,7 +214,6 @@ export default function App() {
   const handleUpdateSession = (session: Session) => {
     const oldSession = sessions.find((s) => s.id === session.id);
     setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
-
     if (!oldSession) return;
     const changed: Presence[] = [];
     Object.entries(session.presences).forEach(([studentId, entry]) => {
@@ -226,21 +270,37 @@ export default function App() {
     const id = "ses" + uid();
     setSessions((prev) => [
       ...prev,
-      {
-        id,
-        scheduleId,
-        day,
-        presences: basePresences,
-        pendingEvos: [],
-        evolved: [],
-        finalized: false,
-      },
+      { id, scheduleId, day, presences: basePresences, pendingEvos: [], evolved: [], finalized: false },
     ]);
     nav("aula", id);
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  const handleClearData = () => {
+    const keys = [
+      "pilates.students", "pilates.anamneses", "pilates.schedules",
+      "pilates.enrollments", "pilates.sessions", "pilates.evolutions",
+      "pilates.payments", "pilates.expenses", "pilates.presence",
+    ];
+    keys.forEach((k) => localStorage.removeItem(k));
+    setStudents([]);
+    setAnamneses({});
+    setSchedules([]);
+    setEnrollments([]);
+    setSessions([]);
+    setEvolutions([]);
+    setPayments([]);
+    setExpenses([]);
+    setPresence([]);
+    nav("dashboard");
+    addToast("Dados apagados com sucesso.", "warning");
+  };
 
+  // ── Login gate ────────────────────────────────────────────────────────────────
+  if (!isLoggedIn || !config?.password) {
+    return <Login config={config} onLogin={handleLogin} onSetup={handleSetup} />;
+  }
+
+  // ── Nav ───────────────────────────────────────────────────────────────────────
   const NAV = [
     { id: "dashboard" as Route, icon: "🏠", label: "Início" },
     { id: "turmas" as Route, icon: "🗓", label: "Turmas" },
@@ -250,25 +310,28 @@ export default function App() {
     { id: "financeiro" as Route, icon: "💰", label: "Financeiro" },
   ];
 
+  const instructorName = config.professionalName || "Instrutor";
+
   return (
     <div className="min-h-screen" style={{ background: t.bg }}>
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm" style={{ borderColor: t.border }}>
-        <div className="flex items-center gap-2">
+        <button onClick={() => nav("dashboard")} className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-sm" style={{ background: t.p[500] }}>
             P
           </div>
           <div>
             <p className="font-bold text-sm leading-tight" style={{ color: t.p[800] }}>
-              Pilates Studio
+              {config.studioName || "Pilates Studio"}
             </p>
             <p className="text-xs text-gray-400">Manager</p>
           </div>
-        </div>
+        </button>
+
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowThemeModal(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all" style={{ borderColor: t.p[200], color: t.p[600], background: t.p[50] }}>
-            🎨 <span className="hidden sm:inline">{t.name}</span>
-          </button>
           {pendingCount > 0 && (
             <div className="relative cursor-pointer" onClick={() => nav("evolucoes")}>
               <span className="text-lg">🔔</span>
@@ -277,7 +340,15 @@ export default function App() {
               </span>
             </div>
           )}
-          <Av name="Maria Costa" size={8} t={t} />
+          <button
+            onClick={() => nav("configuracoes")}
+            className="w-8 h-8 flex items-center justify-center rounded-xl border transition-all hover:opacity-80"
+            style={{ borderColor: t.p[200], background: t.p[50] }}
+            title="Configurações"
+          >
+            <span className="text-base">⚙️</span>
+          </button>
+          <Av name={instructorName} size={8} t={t} />
         </div>
       </div>
 
@@ -286,15 +357,19 @@ export default function App() {
         {route === "dashboard" && (
           <Dashboard
             t={t}
+            config={config}
             students={students}
             payments={payments}
             expenses={expenses}
             schedules={schedules}
             sessions={sessions}
             enrollments={enrollments}
+            presence={presence}
+            plans={plans}
             pendingCount={pendingCount}
             onNavigate={nav}
             onOpenScheduleSession={handleOpenScheduleSession}
+            onToast={addToast}
           />
         )}
 
@@ -307,6 +382,7 @@ export default function App() {
             onUpdateSchedules={setSchedules}
             onUpdateEnrollments={setEnrollments}
             onUpdateClassTypes={setClassTypes}
+            onToast={addToast}
           />
         )}
 
@@ -316,6 +392,7 @@ export default function App() {
             students={students}
             payments={payments}
             plans={plans}
+            presence={presence}
             onSelectStudent={(id) => nav("ficha", id)}
           />
         )}
@@ -340,6 +417,7 @@ export default function App() {
             plans={plans}
             schedules={schedules}
             payments={payments}
+            onToast={addToast}
           />
         )}
 
@@ -354,6 +432,7 @@ export default function App() {
             onUpdateSession={handleUpdateSession}
             onUpdateStudent={handleUpdateStudent}
             onNavigate={nav}
+            onToast={addToast}
           />
         )}
 
@@ -378,6 +457,7 @@ export default function App() {
             onOpenEvoModal={(pend, existingEvo) => setEvoModal({ pending: pend, existingEvo })}
             onOpenReciboModal={setReciboModal}
             onPayment={handlePayment}
+            onToast={addToast}
           />
         )}
 
@@ -392,6 +472,21 @@ export default function App() {
             onOpenReciboModal={setReciboModal}
             onUpdatePlans={setPlans}
             onUpdateExpenses={setExpenses}
+            onToast={addToast}
+          />
+        )}
+
+        {route === "configuracoes" && config && (
+          <Configuracoes
+            t={t}
+            themeKey={themeKey}
+            config={config}
+            onUpdateConfig={handleUpdateConfig}
+            onChangeTheme={(k) => setThemeKey(k)}
+            onNavigate={nav}
+            onClearData={handleClearData}
+            onLogout={handleLogout}
+            onToast={addToast}
           />
         )}
       </div>
@@ -417,8 +512,6 @@ export default function App() {
       </div>
 
       {/* Modals */}
-      {showThemeModal && <ThemeModal current={themeKey} onChange={(k) => setThemeKey(k as ThemeKey)} onClose={() => setShowThemeModal(false)} t={t} themes={THEMES as unknown as Record<string, import("./types").Theme>} />}
-
       {evoModal && (
         <EvoForm
           pending={evoModal.pending}
@@ -426,13 +519,24 @@ export default function App() {
           student={gS(evoModal.pending.studentId)}
           schedule={evoModal.pending.schedule}
           classTypes={classTypes}
+          instructorName={instructorName}
           onSave={handleSaveEvo}
           onClose={() => setEvoModal(null)}
+          onToast={addToast}
           t={t}
         />
       )}
 
-      {reciboModal && <ReciboModal payment={reciboModal.payment} student={reciboModal.student} plan={reciboModal.plan} t={t} onClose={() => setReciboModal(null)} />}
+      {reciboModal && (
+        <ReciboModal
+          payment={reciboModal.payment}
+          student={reciboModal.student}
+          plan={reciboModal.plan}
+          studioName={config.studioName || "Pilates Studio"}
+          t={t}
+          onClose={() => setReciboModal(null)}
+        />
+      )}
     </div>
   );
 }

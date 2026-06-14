@@ -13,12 +13,16 @@ interface AulaProps {
   onUpdateSession: (session: Session) => void;
   onUpdateStudent: (student: Student) => void;
   onNavigate: (route: string, id?: string | null) => void;
+  onToast: (msg: string, type?: "success" | "error" | "warning") => void;
 }
 
 const isFaltaStatus = (s: PresenceStatus): boolean =>
   s === "falta" || s === "falta_justificada" || s === "falta_nao_justificada";
 
-export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSession, onUpdateStudent, onNavigate }: AulaProps) {
+export function Aula({
+  t, sessionId, sessions, schedules, students,
+  onUpdateSession, onUpdateStudent, onNavigate, onToast,
+}: AulaProps) {
   const [showWh, setShowWh] = useState(false);
   const [showRep, setShowRep] = useState(false);
 
@@ -63,13 +67,41 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
     onUpdateSession(updatedSession);
   };
 
+  const markAllPresent = () => {
+    const newPresences = { ...ses.presences };
+    const newPendingEvos = [...(ses.pendingEvos || [])];
+    let changed = 0;
+
+    Object.keys(newPresences).forEach((studentId) => {
+      if (newPresences[studentId].status !== "presente") {
+        const currentStatus = newPresences[studentId].status;
+        const wasFalta = isFaltaStatus(currentStatus);
+        if (wasFalta) {
+          const student = gS(studentId);
+          if (student) onUpdateStudent({ ...student, repCredits: Math.max(0, student.repCredits - 1) });
+        }
+        newPresences[studentId] = { ...newPresences[studentId], status: "presente" };
+        if (!newPendingEvos.includes(studentId) && !(ses.evolved || []).includes(studentId)) {
+          newPendingEvos.push(studentId);
+        }
+        changed++;
+      }
+    });
+
+    if (changed === 0) {
+      onToast("Todos já estão marcados como presentes.", "info" as any);
+      return;
+    }
+
+    onUpdateSession({ ...ses, presences: newPresences, pendingEvos: newPendingEvos });
+    onToast(`${changed} aluno${changed !== 1 ? "s" : ""} marcado${changed !== 1 ? "s" : ""} como presente${changed !== 1 ? "s" : ""}.`);
+  };
+
   const removeFromSession = (studentId: string) => {
     const pres = ses.presences[studentId];
     if (pres?.type === "reposicao") {
       const student = gS(studentId);
-      if (student) {
-        onUpdateStudent({ ...student, repCredits: student.repCredits + 1 });
-      }
+      if (student) onUpdateStudent({ ...student, repCredits: student.repCredits + 1 });
     }
     const updatedPresences = { ...ses.presences };
     delete updatedPresences[studentId];
@@ -84,27 +116,26 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
   const insertStudent = (studentId: string, type: "wellhub" | "reposicao") => {
     if (type === "reposicao") {
       const student = gS(studentId);
-      if (student) {
-        onUpdateStudent({ ...student, repCredits: student.repCredits - 1 });
-      }
+      if (student) onUpdateStudent({ ...student, repCredits: student.repCredits - 1 });
     }
     const updatedSession = {
       ...ses,
-      presences: {
-        ...ses.presences,
-        [studentId]: { status: null, type } as PresenceEntry,
-      },
+      presences: { ...ses.presences, [studentId]: { status: null, type } as PresenceEntry },
     };
     onUpdateSession(updatedSession);
     if (type === "reposicao") setShowRep(false);
     else setShowWh(false);
+    onToast(`${type === "wellhub" ? "Aluno Wellhub" : "Reposição"} adicionado à aula.`);
   };
 
   const PRESENCE_BTNS = [
     { status: "presente" as const, label: "✓", title: "Presente", bg: "#22c55e" },
     { status: "falta_justificada" as const, label: "J", title: "Falta Justificada", bg: "#f59e0b" },
-    { status: "falta_nao_justificada" as const, label: "✕", title: "Falta Não Justificada", bg: "#ef4444" },
+    { status: "falta_nao_justificada" as const, label: "✕", title: "Falta", bg: "#ef4444" },
   ];
+
+  const presentCount = entries.filter(([, p]) => p.status === "presente").length;
+  const allPresent = presentCount === total && total > 0;
 
   return (
     <div className="space-y-4">
@@ -124,21 +155,30 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
 
       <Card t={t}>
         <div className="flex justify-between text-xs mb-2">
-          <span style={{ color: t.p[600] }}>Vagas</span>
+          <span style={{ color: t.p[600] }}>Ocupação da turma</span>
           <span className="font-bold" style={{ color: t.p[700] }}>
             {total}/{sc.maxCapacity}
           </span>
         </div>
-        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-3">
           <div
-            className="h-full rounded-full"
+            className="h-full rounded-full transition-all"
             style={{
-              width: `${(total / sc.maxCapacity) * 100}%`,
+              width: `${Math.min((total / sc.maxCapacity) * 100, 100)}%`,
               background: total >= sc.maxCapacity ? t.p[600] : t.p[400],
             }}
           />
         </div>
-        <div className="flex gap-2 mt-3">
+        <div className="flex gap-2 flex-wrap">
+          <Btn
+            t={t}
+            className="flex-1"
+            style={{ fontSize: 12 }}
+            onClick={markAllPresent}
+            disabled={allPresent}
+          >
+            ✓ Todos presentes
+          </Btn>
           <Btn outline t={t} className="flex-1" style={{ fontSize: 12 }} onClick={() => setShowWh(true)}>
             + Wellhub
           </Btn>
@@ -147,6 +187,13 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
           </Btn>
         </div>
       </Card>
+
+      {entries.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-sm text-gray-400">Nenhum aluno inscrito nesta turma para hoje.</p>
+          <p className="text-xs text-gray-400 mt-1">Use os botões acima para adicionar Wellhub ou Reposição.</p>
+        </div>
+      )}
 
       <div className="space-y-2">
         {entries.map(([sid, pres]) => {
@@ -167,7 +214,7 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
                     </p>
                     <SBadge s={pres.type} t={t} />
                     {s.hasRestriction && (
-                      <span className="text-xs bg-orange-100 text-orange-600 px-1 rounded-full">⚠</span>
+                      <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">⚠ Restrição</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap text-xs">
@@ -175,8 +222,8 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
                     {pres.status === "falta_justificada" && <span className="text-amber-600 font-medium">⚠️ Falta Justificada</span>}
                     {(pres.status === "falta_nao_justificada" || pres.status === "falta") && <span className="text-red-400 font-medium">❌ Falta</span>}
                     {!pres.status && <span className="text-gray-400">Aguardando...</span>}
-                    {isPending && !evoOk && <span className="text-amber-500">📋 Pendente</span>}
-                    {evoOk && <span className="text-emerald-500">📋 OK</span>}
+                    {isPending && !evoOk && <span className="text-amber-500 font-medium">📋 Evolução pendente</span>}
+                    {evoOk && <span className="text-emerald-500 font-medium">📋 Evolução OK</span>}
                   </div>
                 </div>
                 <div className="flex gap-1.5 items-center">
@@ -225,10 +272,8 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
       {showWh && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.3)" }}>
           <div className="bg-white rounded-t-2xl w-full max-w-lg p-5">
-            <h3 className="font-bold mb-3" style={{ color: t.p[800] }}>
-              Inserir Wellhub
-            </h3>
-            <div className="space-y-2">
+            <h3 className="font-bold mb-3" style={{ color: t.p[800] }}>Inserir Wellhub</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
               {students
                 .filter((s) => s.status === "Wellhub" && !ses.presences[s.id])
                 .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
@@ -236,22 +281,18 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
                   <button
                     key={s.id}
                     onClick={() => insertStudent(s.id, "wellhub")}
-                    className="w-full flex items-center justify-between p-3 rounded-xl transition-all hover:opacity-80"
+                    className="w-full flex items-center gap-3 p-3 rounded-xl transition-all hover:opacity-80"
                     style={{ background: t.p[50] }}
                   >
-                    <div className="flex items-center gap-3">
-                      <Av name={s.name} t={t} />
-                      <span className="text-sm font-medium">{s.name}</span>
-                    </div>
+                    <Av name={s.name} t={t} />
+                    <span className="text-sm font-medium">{s.name}</span>
                   </button>
                 ))}
               {students.filter((s) => s.status === "Wellhub" && !ses.presences[s.id]).length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-2">Nenhum disponível.</p>
+                <p className="text-sm text-gray-400 text-center py-2">Nenhum aluno Wellhub disponível.</p>
               )}
             </div>
-            <Btn outline t={t} className="mt-3 w-full" onClick={() => setShowWh(false)}>
-              Fechar
-            </Btn>
+            <Btn outline t={t} className="mt-3 w-full" onClick={() => setShowWh(false)}>Fechar</Btn>
           </div>
         </div>
       )}
@@ -260,10 +301,8 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
       {showRep && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.3)" }}>
           <div className="bg-white rounded-t-2xl w-full max-w-lg p-5">
-            <h3 className="font-bold mb-3" style={{ color: t.p[800] }}>
-              Inserir Reposição
-            </h3>
-            <div className="space-y-2">
+            <h3 className="font-bold mb-3" style={{ color: t.p[800] }}>Inserir Reposição</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
               {students
                 .filter((s) => s.repCredits > 0 && !ses.presences[s.id])
                 .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
@@ -284,12 +323,10 @@ export function Aula({ t, sessionId, sessions, schedules, students, onUpdateSess
                   </button>
                 ))}
               {students.filter((s) => s.repCredits > 0 && !ses.presences[s.id]).length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-2">Nenhum disponível.</p>
+                <p className="text-sm text-gray-400 text-center py-2">Nenhum crédito de reposição disponível.</p>
               )}
             </div>
-            <Btn outline t={t} className="mt-3 w-full" onClick={() => setShowRep(false)}>
-              Fechar
-            </Btn>
+            <Btn outline t={t} className="mt-3 w-full" onClick={() => setShowRep(false)}>Fechar</Btn>
           </div>
         </div>
       )}
