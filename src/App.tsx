@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import type {
   Route, ThemeKey, Student, Plan, Schedule, Enrollment, Session,
   Evolution, Payment, Expense, Presence, Anamnese, PendingEvolution,
-  StudioConfig, ToastItem,
+  StudioConfig, ToastItem, Professional,
 } from "./types";
 import {
   THEMES, INIT_STUDENTS, INIT_PLANS, INIT_SCHEDULES, INIT_ENROLLMENTS,
@@ -90,6 +90,18 @@ export default function App() {
   const [payments, setPayments] = useStoredState<Payment[]>("pilates.payments", INIT_PAYMENTS as Payment[]);
   const [expenses, setExpenses] = useStoredState<Expense[]>("pilates.expenses", INIT_EXPENSES as Expense[]);
   const [presence, setPresence] = useStoredState<Presence[]>("pilates.presence", INIT_PRESENCE as Presence[]);
+  const [professionals, setProfessionals] = useStoredState<Professional[]>("pilates.professionals", []);
+
+  useEffect(() => {
+    if (config && professionals.length === 0) {
+      setProfessionals([{
+        id: "prof0",
+        name: config.professionalName || "Profissional",
+        crefito: config.crefito || "",
+        active: true,
+      }]);
+    }
+  }, []);
 
   // ── Toasts ────────────────────────────────────────────────────────────────────
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -275,6 +287,33 @@ export default function App() {
     nav("aula", id);
   };
 
+  const handleDeleteStudent = (studentId: string) => {
+    setStudents((prev) => prev.filter((s) => s.id !== studentId));
+    setEnrollments((prev) => prev.filter((e) => e.studentId !== studentId));
+    setEvolutions((prev) => prev.filter((e) => e.studentId !== studentId));
+    setPayments((prev) => prev.filter((p) => p.studentId !== studentId));
+    setPresence((prev) => prev.filter((p) => p.studentId !== studentId));
+    setAnamneses((prev) => {
+      const { [studentId]: _, ...rest } = prev;
+      return rest;
+    });
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (!s.presences[studentId]) return s;
+        const newPresences = { ...s.presences };
+        delete newPresences[studentId];
+        return {
+          ...s,
+          presences: newPresences,
+          pendingEvos: (s.pendingEvos || []).filter((id) => id !== studentId),
+          evolved: (s.evolved || []).filter((id) => id !== studentId),
+        };
+      })
+    );
+    nav("alunos");
+    addToast("Aluno removido com sucesso.", "warning");
+  };
+
   const handleClearData = () => {
     const keys = [
       "pilates.students", "pilates.anamneses", "pilates.schedules",
@@ -457,6 +496,7 @@ export default function App() {
             onOpenEvoModal={(pend, existingEvo) => setEvoModal({ pending: pend, existingEvo })}
             onOpenReciboModal={setReciboModal}
             onPayment={handlePayment}
+            onDeleteStudent={handleDeleteStudent}
             onToast={addToast}
           />
         )}
@@ -481,7 +521,9 @@ export default function App() {
             t={t}
             themeKey={themeKey}
             config={config}
+            professionals={professionals}
             onUpdateConfig={handleUpdateConfig}
+            onUpdateProfessionals={setProfessionals}
             onChangeTheme={(k) => setThemeKey(k)}
             onNavigate={nav}
             onClearData={handleClearData}
@@ -520,6 +562,7 @@ export default function App() {
           schedule={evoModal.pending.schedule}
           classTypes={classTypes}
           instructorName={instructorName}
+          professionals={professionals}
           onSave={handleSaveEvo}
           onClose={() => setEvoModal(null)}
           onToast={addToast}

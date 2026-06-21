@@ -38,14 +38,18 @@ export function Aula({
   const evolved = ses.evolved || [];
   const total = entries.length;
 
-  const handlePresence = (studentId: string, status: "presente" | "falta_justificada" | "falta_nao_justificada") => {
+  const handlePresence = (studentId: string, clickedStatus: "presente" | "falta_justificada" | "falta_nao_justificada") => {
     const currentStatus = ses.presences[studentId]?.status ?? null;
-    if (currentStatus === status) return;
+
+    const isAlreadyActive =
+      currentStatus === clickedStatus ||
+      (clickedStatus === "falta_nao_justificada" && currentStatus === "falta");
+    const newStatus: PresenceStatus = isAlreadyActive ? null : clickedStatus;
 
     const student = gS(studentId);
     if (student) {
       const wasFalta = isFaltaStatus(currentStatus);
-      const willBeFalta = isFaltaStatus(status);
+      const willBeFalta = newStatus !== null && isFaltaStatus(newStatus);
       if (willBeFalta && !wasFalta) {
         onUpdateStudent({ ...student, repCredits: student.repCredits + 1 });
       } else if (!willBeFalta && wasFalta) {
@@ -54,9 +58,9 @@ export function Aula({
     }
 
     const updatedSession = { ...ses, presences: { ...ses.presences } };
-    updatedSession.presences[studentId] = { ...ses.presences[studentId], status };
+    updatedSession.presences[studentId] = { ...ses.presences[studentId], status: newStatus };
 
-    if (status === "presente") {
+    if (newStatus === "presente") {
       if (!(ses.pendingEvos || []).includes(studentId) && !(ses.evolved || []).includes(studentId)) {
         updatedSession.pendingEvos = [...(updatedSession.pendingEvos || []), studentId];
       }

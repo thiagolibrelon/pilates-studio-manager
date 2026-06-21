@@ -25,6 +25,7 @@ export function Dashboard({
   enrollments, presence, plans, pendingCount, onNavigate, onOpenScheduleSession,
 }: DashboardProps) {
   const [showInadModal, setShowInadModal] = useState(false);
+  const [showLowFreqModal, setShowLowFreqModal] = useState(false);
 
   const activeStudents = students.filter((s) => ["Ativo", "Trial", "Wellhub"].includes(s.status));
 
@@ -144,35 +145,18 @@ export function Dashboard({
 
       {/* Alertas de baixa frequência */}
       {lowFreqStudents.length > 0 && (
-        <div className="rounded-2xl p-4 border-2 border-orange-200 bg-orange-50">
-          <p className="text-sm font-bold text-orange-700 mb-2">📉 Baixa frequência este mês</p>
-          {lowFreqStudents.map((s) => {
-            const plan = plans.find((p) => p.id === s.planId);
-            const monthPres = presence.filter(
-              (p) => p.studentId === s.id && p.day.startsWith(currentMonth) && p.status === "presente"
-            ).length;
-            return (
-              <div key={s.id} className="flex items-center justify-between py-1.5">
-                <div className="flex items-center gap-2">
-                  <Av name={s.name} size={7} t={t} />
-                  <div>
-                    <p className="text-xs font-semibold text-orange-800">{s.name}</p>
-                    <p className="text-xs text-orange-600">
-                      {monthPres}/{plan?.classesPerMonth || "?"} aulas · {plan?.name}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onNavigate("ficha", s.id)}
-                  className="text-xs px-2 py-1 rounded-lg text-white transition-all hover:opacity-80"
-                  style={{ background: "#f97316" }}
-                >
-                  Ver
-                </button>
-              </div>
-            );
-          })}
-        </div>
+        <button
+          onClick={() => setShowLowFreqModal(true)}
+          className="w-full rounded-2xl p-4 border-2 border-orange-200 bg-orange-50 flex items-center justify-between text-left transition-all hover:opacity-80"
+        >
+          <div>
+            <p className="text-sm font-bold text-orange-700">📉 Baixa frequência</p>
+            <p className="text-xs text-orange-600 mt-0.5">
+              {lowFreqStudents.length} aluno{lowFreqStudents.length !== 1 ? "s" : ""} abaixo de 60% este mês
+            </p>
+          </div>
+          <span className="text-xl text-orange-400">›</span>
+        </button>
       )}
 
       {/* KPI Cards */}
@@ -356,6 +340,48 @@ export function Dashboard({
           ))
         )}
       </Card>
+
+      {/* Modal Baixa Frequência */}
+      {showLowFreqModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="p-5 border-b" style={{ borderColor: t.p[100] }}>
+              <h2 className="font-bold text-lg" style={{ color: t.p[800] }}>📉 Baixa Frequência</h2>
+              <p className="text-xs text-gray-400">Alunos abaixo de 60% no mês atual</p>
+            </div>
+            <div className="p-5 space-y-2 max-h-72 overflow-y-auto">
+              {lowFreqStudents.map((s) => {
+                const plan = plans.find((p) => p.id === s.planId);
+                const monthPres = presence.filter(
+                  (p) => p.studentId === s.id && p.day.startsWith(currentMonth) && p.status === "presente"
+                ).length;
+                const expected = Math.round((plan?.classesPerMonth || 0) * (dayOfMonth / 30));
+                const pct = expected > 0 ? Math.round((monthPres / expected) * 100) : 0;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => { setShowLowFreqModal(false); onNavigate("ficha", s.id); }}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all hover:opacity-80"
+                    style={{ background: t.p[50] }}
+                  >
+                    <Av name={s.name} t={t} />
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm" style={{ color: t.p[800] }}>{s.name}</p>
+                      <p className="text-xs text-orange-600">
+                        {monthPres}/{plan?.classesPerMonth || "?"} aulas · {pct}%
+                      </p>
+                    </div>
+                    <span style={{ color: t.p[400] }}>›</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="p-5 border-t" style={{ borderColor: t.p[100] }}>
+              <Btn outline t={t} className="w-full" onClick={() => setShowLowFreqModal(false)}>Fechar</Btn>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Inadimplentes */}
       {showInadModal && (

@@ -23,6 +23,7 @@ interface FichaProps {
   onOpenEvoModal: (pend: PendingEvolution, existingEvo?: Evolution) => void;
   onOpenReciboModal: (data: { payment: Payment; student: Student; plan: Plan | undefined }) => void;
   onPayment: (paymentId: string, method: string, amount?: number) => void;
+  onDeleteStudent: (id: string) => void;
   onToast: (msg: string, type?: "success" | "error" | "warning") => void;
 }
 
@@ -46,6 +47,7 @@ export function Ficha({
   onOpenEvoModal,
   onOpenReciboModal,
   onPayment,
+  onDeleteStudent,
   onToast,
 }: FichaProps) {
   const [tab, setTab] = useState<"evolucoes" | "presencas" | "anamnese" | "horarios" | "financeiro" | "dados">("evolucoes");
@@ -54,6 +56,7 @@ export function Ficha({
   const [showEnrF, setShowEnrF] = useState(false);
   const [enrForm, setEnrForm] = useState({ scheduleId: "", days: [] as string[] });
   const [payConfirm, setPayConfirm] = useState<{ payId: string; method: string; amount: string } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isNew = studentId === "novo";
 
@@ -98,7 +101,7 @@ export function Ficha({
   const myEnrs = isNew ? [] : enrollments.filter((e) => e.studentId === form.id);
   const stEvos = isNew
     ? []
-    : evolutions.filter((e) => e.studentId === form.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    : evolutions.filter((e) => e.studentId === form.id).sort((a, b) => b.day.localeCompare(a.day));
   const stPays = isNew ? [] : payments.filter((p) => p.studentId === form.id);
   const stPend = isNew ? [] : allPending.filter((p) => p.studentId === form.id);
   const stHist = isNew ? [] : presence.filter((h) => h.studentId === form.id);
@@ -243,6 +246,38 @@ export function Ficha({
           <Btn t={t} className="w-full" onClick={saveForm}>
             {isNew ? "Cadastrar Aluno" : "Salvar Alterações"}
           </Btn>
+          {!isNew && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full mt-1 rounded-xl border border-red-200 text-red-500 font-medium text-sm py-2.5 transition-all hover:bg-red-50"
+            >
+              Deletar aluno
+            </button>
+          )}
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="p-5 border-b" style={{ borderColor: t.p[100] }}>
+              <h2 className="font-bold text-lg text-red-700">Deletar aluno</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Todos os dados de <strong>{form.name}</strong> serão removidos permanentemente.
+              </p>
+            </div>
+            <div className="p-5 flex gap-3">
+              <Btn outline t={t} className="flex-1" onClick={() => setShowDeleteConfirm(false)}>
+                Cancelar
+              </Btn>
+              <button
+                onClick={() => { setShowDeleteConfirm(false); onDeleteStudent(form.id); }}
+                className="flex-1 rounded-xl bg-red-600 text-white font-semibold text-sm py-2.5 transition-all hover:bg-red-700"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Theme, StudioConfig, ThemeKey } from "../types";
+import type { Theme, StudioConfig, ThemeKey, Professional } from "../types";
 import { THEMES } from "../data";
 import { Card, Btn, Inp } from "./ui";
 
@@ -7,7 +7,9 @@ interface ConfiguracoesProps {
   t: Theme;
   themeKey: ThemeKey;
   config: StudioConfig;
+  professionals: Professional[];
   onUpdateConfig: (config: StudioConfig) => void;
+  onUpdateProfessionals: (professionals: Professional[]) => void;
   onChangeTheme: (key: ThemeKey) => void;
   onNavigate: (route: string) => void;
   onClearData: () => void;
@@ -19,7 +21,9 @@ export function Configuracoes({
   t,
   themeKey,
   config,
+  professionals,
   onUpdateConfig,
+  onUpdateProfessionals,
   onChangeTheme,
   onNavigate,
   onClearData,
@@ -30,6 +34,8 @@ export function Configuracoes({
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [showClear, setShowClear] = useState(false);
+  const [profForm, setProfForm] = useState({ name: "", crefito: "" });
+  const [showProfForm, setShowProfForm] = useState(false);
 
   const saveStudio = () => {
     if (!form.studioName.trim() || !form.professionalName.trim()) {
@@ -38,6 +44,22 @@ export function Configuracoes({
     }
     onUpdateConfig({ ...form, password: config.password });
     onToast("Configurações salvas com sucesso!");
+  };
+
+  const addProfessional = () => {
+    if (!profForm.name.trim()) {
+      onToast("Nome é obrigatório.", "warning");
+      return;
+    }
+    const id = "prof" + Math.random().toString(36).slice(2, 9);
+    onUpdateProfessionals([...professionals, { id, name: profForm.name.trim(), crefito: profForm.crefito.trim(), active: true }]);
+    setProfForm({ name: "", crefito: "" });
+    setShowProfForm(false);
+    onToast("Profissional adicionado!");
+  };
+
+  const toggleProfessional = (id: string) => {
+    onUpdateProfessionals(professionals.map((p) => (p.id === id ? { ...p, active: !p.active } : p)));
   };
 
   const savePassword = () => {
@@ -191,6 +213,68 @@ export function Configuracoes({
         <Btn outline t={t} className="w-full" onClick={onLogout}>
           Sair do sistema
         </Btn>
+      </Card>
+
+      {/* Profissionais */}
+      <Card t={t}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-sm" style={{ color: t.p[800] }}>
+            👩‍⚕️ Profissionais
+          </h2>
+          <button
+            onClick={() => setShowProfForm(!showProfForm)}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg text-white transition-all"
+            style={{ background: t.p[500] }}
+          >
+            + Adicionar
+          </button>
+        </div>
+        {showProfForm && (
+          <div className="space-y-3 mb-4 p-3 rounded-xl border" style={{ borderColor: t.p[100], background: t.p[50] }}>
+            <Inp
+              label="Nome *"
+              value={profForm.name}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfForm({ ...profForm, name: e.target.value })}
+              placeholder="Ex: João Silva"
+            />
+            <Inp
+              label="CREFITO (opcional)"
+              value={profForm.crefito}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfForm({ ...profForm, crefito: e.target.value })}
+              placeholder="Ex: 4/123456-F"
+            />
+            <div className="flex gap-2">
+              <Btn outline t={t} className="flex-1" onClick={() => { setShowProfForm(false); setProfForm({ name: "", crefito: "" }); }}>
+                Cancelar
+              </Btn>
+              <Btn t={t} className="flex-1" onClick={addProfessional}>
+                Salvar
+              </Btn>
+            </div>
+          </div>
+        )}
+        {professionals.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-3">Nenhum profissional cadastrado.</p>
+        )}
+        <div className="space-y-2">
+          {professionals.map((p) => (
+            <div key={p.id} className="flex items-center justify-between p-3 rounded-xl border" style={{ borderColor: t.border }}>
+              <div>
+                <p className="text-sm font-medium" style={{ color: t.p[800] }}>{p.name}</p>
+                {p.crefito && <p className="text-xs text-gray-400">{p.crefito}</p>}
+              </div>
+              <button
+                onClick={() => toggleProfessional(p.id)}
+                className="text-xs px-3 py-1 rounded-lg font-medium transition-all"
+                style={p.active
+                  ? { background: t.p[100], color: t.p[700] }
+                  : { background: "#f1f5f9", color: "#94a3b8" }}
+              >
+                {p.active ? "Ativo" : "Inativo"}
+              </button>
+            </div>
+          ))}
+        </div>
       </Card>
 
       {/* Zona de Perigo */}

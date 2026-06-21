@@ -1,5 +1,5 @@
-import type { Theme, Payment, Student, Plan, Schedule, PendingEvolution, Evolution } from "../types";
-import { Btn, SigCanvas, TA, Inp, DateInp } from "./ui";
+import type { Theme, Payment, Student, Plan, Schedule, PendingEvolution, Evolution, Professional } from "../types";
+import { Btn, SigCanvas, TA, Inp, DateInp, Sl } from "./ui";
 import { fmt, fmtM, MONTHS, vencStr, TODAY } from "../utils";
 import { useState } from "react";
 
@@ -12,21 +12,27 @@ interface EvoFormProps {
   schedule: Schedule | undefined;
   classTypes: string[];
   instructorName: string;
+  professionals: Professional[];
   onSave: (data: any) => void;
   onClose: () => void;
   onToast: (msg: string, type?: "success" | "error" | "warning") => void;
   t: Theme;
 }
 
-export function EvoForm({ pending, existingEvo, student, schedule, classTypes, instructorName, onSave, onClose, onToast, t }: EvoFormProps) {
+export function EvoForm({ pending, existingEvo, student, schedule, classTypes, instructorName, professionals, onSave, onClose, onToast, t }: EvoFormProps) {
   const [selectedExercises, setSelectedExercises] = useState<string[]>(
     existingEvo?.exercises.map((e) => e.name) || []
   );
   const [notes, setNotes] = useState(existingEvo?.clinicalNotes || "");
   const [sig, setSig] = useState<string | null>(null);
   const [evoDate, setEvoDate] = useState(existingEvo?.day || pending.day || TODAY);
+  const activeProfessionals = professionals.filter((p) => p.active);
+  const [professionalId, setProfessionalId] = useState<string>(
+    existingEvo?.professionalId || activeProfessionals[0]?.id || ""
+  );
 
   const isEditing = !!existingEvo;
+  const isRetroactive = evoDate < TODAY;
 
   const toggleExercise = (name: string) => {
     setSelectedExercises((prev) => (prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]));
@@ -42,6 +48,9 @@ export function EvoForm({ pending, existingEvo, student, schedule, classTypes, i
       onToast("Marque ao menos um exercício.", "warning");
       return;
     }
+    const selectedProf = isRetroactive && professionalId
+      ? activeProfessionals.find((p) => p.id === professionalId)
+      : undefined;
     onSave({
       sessionId: isEditing ? "" : pending.sessionId,
       studentId: pending.studentId,
@@ -49,7 +58,8 @@ export function EvoForm({ pending, existingEvo, student, schedule, classTypes, i
       exercises: selectedExercises.map((name) => ({ name })),
       clinicalNotes: notes,
       signature: finalSig,
-      instructor: instructorName,
+      instructor: selectedProf ? selectedProf.name : instructorName,
+      professionalId: selectedProf ? selectedProf.id : undefined,
       createdAt: existingEvo?.createdAt || new Date().toISOString(),
       day: evoDate,
     });
@@ -72,6 +82,19 @@ export function EvoForm({ pending, existingEvo, student, schedule, classTypes, i
             value={evoDate}
             onChange={(v) => setEvoDate(v)}
           />
+          {isRetroactive && activeProfessionals.length > 0 && (
+            <Sl
+              label="Responsável pelo atendimento"
+              value={professionalId}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setProfessionalId(e.target.value)}
+            >
+              {activeProfessionals.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.crefito ? ` — ${p.crefito}` : ""}
+                </option>
+              ))}
+            </Sl>
+          )}
           <div>
             <div className="mb-2">
               <span className="text-sm font-semibold" style={{ color: t.p[700] }}>

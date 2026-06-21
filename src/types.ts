@@ -47,6 +47,15 @@ export interface StudioConfig {
   password: string;
 }
 
+// ── Professional ───────────────────────────────────────────────────────────────────────────
+
+export interface Professional {
+  id: string;
+  name: string;
+  crefito: string;
+  active: boolean;
+}
+
 // ── Toast ─────────────────────────────────────────────────────────────────────────────────
 
 export interface ToastItem {
@@ -143,6 +152,7 @@ export interface Evolution {
   day: string;
   studentId: string;
   instructor: string;
+  professionalId?: string;
   exercises: Exercise[];
   clinicalNotes: string;
   signature: string;
